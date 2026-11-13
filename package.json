@@ -1,0 +1,24 @@
+{
+  "name": "nmos-routing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NMOS Routing: the Route Desk operator UI driven by the nmos-crosspoint engine (IS-04/IS-05, multicast leases, BCP-008)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace packages/crosspoint-engine",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check server.mjs && node --check route-server.mjs && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "nmos-crosspoint-engine": "*",
+    "ws": "8.22.0"
+  },
+  "author": "KeithB-Media"
+}

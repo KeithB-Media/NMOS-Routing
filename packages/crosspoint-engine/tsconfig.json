@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "target": "es2018",
+        "module": "commonjs",
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "sourceMap": true,
+        "lib": [
+            "esnext"
+        ],
+        "types": [
+            "node"
+        ],
+        "skipLibCheck": true
+    }
+}

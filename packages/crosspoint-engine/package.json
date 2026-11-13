@@ -1,0 +1,45 @@
+{
+  "name": "nmos-crosspoint-engine",
+  "version": "3.71",
+  "author": "Johannes Grieb",
+  "license": "MIT",
+  "description": "NMOS Crosspoint server engine (vendored from chrisjlapp/nmos-crosspoint_v3), consumed as a library by NMOS Routing",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "echo \"no engine tests\""
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "express": "^4.18.2",
+    "fast-json-patch": "^3.1.1",
+    "multicast-dns": "^7.2.5",
+    "rfc6902": "^5.1.1",
+    "rxjs": "^7.8.1",
+    "sdp-transform": "^2.14.2",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/multicast-dns": "^7.2.4",
+    "@types/node": "^20.11.16",
+    "@types/sdp-transform": "^2.4.9",
+    "@types/ws": "^8.5.10",
+    "tsc-watch": "^6.0.4",
+    "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "rimraf": "^6.0.1",
+    "glob": "^12.0.0",
+    "inflight": "npm:lru-cache@^10.4.3"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./lib/*": "./dist/lib/*.js",
+    "./probe": "./dist/probe.js"
+  },
+  "optionalDependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "werift": "^0.23.0"
+  }
+}

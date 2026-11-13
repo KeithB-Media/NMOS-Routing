@@ -1,0 +1,13 @@
+.git
+node_modules
+packages/*/node_modules
+packages/*/dist
+data
+config
+log
+state
+test
+test-output
+.env
+*.md
+!README.md

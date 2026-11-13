@@ -1,0 +1,35 @@
+# NMOS Routing. Registry discovery (DNS-SD/mDNS), IS-05 control and the
+# multicast probe all expect the container on the media/control network, so
+# host networking is the default. For bridge networking set NMOS_REGISTRY and
+# publish ${PORT} instead.
+services:
+  nmos-routing:
+    build: .
+    image: nmos-routing:0.1.0
+    container_name: nmos-routing
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    environment:
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8194}
+      ROUTING_MODE: ${ROUTING_MODE:-live}
+      NMOS_REGISTRY: ${NMOS_REGISTRY:-}
+      NMOS_REGISTRY_PORT: ${NMOS_REGISTRY_PORT:-80}
+      WRITE_ENABLED: ${WRITE_ENABLED:-false}
+      ENGINE_LOG: ${ENGINE_LOG:-false}
+      UI_USERNAME: ${UI_USERNAME:-operator}
+      UI_PASSWORD: ${UI_PASSWORD:-}
+      EMBED_ALLOWED_ORIGINS: ${EMBED_ALLOWED_ORIGINS:-}
+    volumes:
+      # Local metadata plus the engine's config/ (settings.json) and state/ (leases, aliases, hidden flags).
+      - routing-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  routing-data:
