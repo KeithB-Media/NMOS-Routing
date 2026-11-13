@@ -64,7 +64,12 @@ indicator until the registry push arrives.
    mixes (see `packages/crosspoint-engine/UPSTREAM-PATCHES.md`). Adapter
    exposes `level.network.transport` and `.mxl`; planners refuse mismatches.
    Still open: BCP-004-01 constraint-set evaluation beyond the transport check.
-5. **Audio monitor + multicast probe** — optional native deps
-   (`@discordjs/opus`, `werift`), WebRTC listen-in, probe websocket.
-6. **Virtual NMOS node + DDNS** — mount `NmosNodeApi` routes on the Route
-   Desk HTTP server; register with the registry.
+5. ~~Audio monitor + multicast probe~~ — done: `/api/audio/*`,
+   `public/audio-monitor.js`, `/probe` upgrade served by `LiveHub`; native
+   modules are optional (`WITH_AUDIO=1` image build).
+6. ~~Virtual NMOS node + DDNS~~ — done: `NmosNodeApi` mounted on an Express
+   sub-app for `/x-nmos/*`, `NmosNodeRegistration` started/stopped from Setup
+   and re-registered on registry switches; DDNS runs via `DdnsService`.
+
+Open: BCP-004-01 constraint-set evaluation for MXL, IS-08 channel mapping,
+receiver-side SDP (IS-05 active `transport_file`) in the SDP popup.

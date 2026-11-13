@@ -32,5 +32,14 @@ nmos-crosspoint v3 engine (vendored, MIT).
   IS-12 monitors, a status dialog with the four domains, live packet counters
   and a counter reset (`/api/bcp008/counters`, `/api/bcp008/reset`).
 - Activity view tails the engine log (`/api/engine?after=`).
+- Virtual NMOS node: the engine's IS-04 Node API and IS-05 endpoints for
+  virtual senders are served on the NMOS Routing port under `/x-nmos/`
+  (no operator auth) and registered with the registry when enabled in Setup.
+- Multicast probe: `/probe` websocket (token from Setup) for crosspoint_probe
+  containers on the media network; connected probes are listed in
+  `/api/engine`.
+- Audio monitor: headphone button on audio senders streams the multicast as
+  Opus over WebRTC (`/api/audio/*`). Needs the optional native modules —
+  build the image with `WITH_AUDIO=1`.
 - Tests: 78 passing, including IS-05 PATCH-body tests against a mock node and
   a live-mode engine boot test.

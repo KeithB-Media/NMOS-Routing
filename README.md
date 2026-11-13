@@ -51,6 +51,19 @@ docker compose up -d --build
 The compose file uses host networking so registry discovery, IS-05 control
 and multicast features reach the media network.
 
+## Audio monitor and probe
+
+The headphone button next to an audio sender streams it to the browser over
+WebRTC. The server must either see the multicast itself (host networking) or
+have a multicast probe connected: run this same image with `MODE=probe` on a
+host attached to the media network, pointing at `ws://<nmos-routing>/probe`
+with the token shown on the Setup page. The transcoder needs the optional
+native modules, which the default image leaves out:
+
+```bash
+WITH_AUDIO=1 docker compose up -d --build
+```
+
 ## Tests
 
 ```bash

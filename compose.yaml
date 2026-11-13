@@ -4,7 +4,10 @@
 # publish ${PORT} instead.
 services:
   nmos-routing:
-    build: .
+    build:
+      context: .
+      args:
+        WITH_AUDIO: ${WITH_AUDIO:-0}
     image: nmos-routing:0.1.0
     container_name: nmos-routing
     restart: unless-stopped

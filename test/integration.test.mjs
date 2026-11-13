@@ -85,6 +85,7 @@ test('demo server: inventory, ETag caching, routing with missing-level policy, b
   assert(!(await api(app.base,'/api/hidden',{id:'nmos_virtual'})).body.groups.some(g=>g.id==='src:nmos_virtual')===false);
   const sdp=await api(app.base,'/api/sdp?'+new URLSearchParams({groupId:'src:nmos_virtual',view:'source'}));assert.equal(sdp.status,200);assert.match(sdp.body.blocks[0].sdp,/m=audio/);
   const engine=await api(app.base,'/api/engine');assert.equal(engine.body.mode,'demo');assert.deepEqual(engine.body.log,[]);
+  assert.equal((await api(app.base,'/api/audio/subscribe',{senderId:'x',listenerId:'l'})).status,404);assert.equal((await fetch(app.base+'/x-nmos/node/v1.3/self')).status,404);assert.deepEqual(initial.body.audioMonitor,{enabled:false,available:false});
   // BCP-008: the demo state carries one degraded receiver (MON 3 audio 4) and one healthy video.
   const mon3=initial.body.groups.find(g=>g.id==='dst:nmosgrp_mon3');assert.deepEqual(mon3.monitor,{worst:3,count:1});assert.equal(mon3.levels[4].monitor.status,3);assert.equal(mon3.levels[4].monitor.domains.length,4);
   const counters=await api(app.base,'/api/bcp008/counters',{id:mon3.levels[4].id});assert.equal(counters.status,200);assert.equal(counters.body.groups[0].counters.find(c=>c.name==='packets_lost').value,4210);
@@ -167,4 +168,24 @@ test('live server boots the crosspoint engine in-process, reports a missing regi
   const written=JSON.parse(await (await import('node:fs/promises')).readFile(path.join(dataDir,'engine','config','settings.json'),'utf8'));
   assert.deepEqual(written.staticNmosRegistries[0],{ip:'127.0.0.2',port:2,priority:10,domain:''});assert.equal(written.acceptableGmid,'00-1D-C1-FF-FE-00-00-01');assert.equal(written.bcp008.enabled,false);
   await until(async()=>(await api(app.base)).body.engine.registries.some(r=>r.ip==='127.0.0.2'&&r.port===2),10000);
+  // Virtual NMOS node: served without operator auth; empty until virtual senders exist.
+  const self=await fetch(app.base+'/x-nmos/node/v1.3/self');assert.equal(self.status,200);const node=await self.json();assert.match(node.id,/^[0-9a-f-]{36}$/);assert.equal(node.api.versions[0],'v1.3');
+  assert.deepEqual(await (await fetch(app.base+'/x-nmos/node/v1.3/senders')).json(),[]);
+  const sdp='v=0\r\no=- 1 1 IN IP4 10.1.50.1\r\ns=Tone\r\nc=IN IP4 239.30.9.1/32\r\nt=0 0\r\nm=audio 5004 RTP/AVP 97\r\na=rtpmap:97 L24/48000/2\r\n';
+  const withVirtual=await api(app.base,'/api/setup',{virtualSenders:[{name:'Tone',sdp}],virtualNode:{enabled:true}});assert.equal(withVirtual.status,200);
+  assert.match(withVirtual.body.config.virtualSenders[0].senderId,/^[0-9a-f-]{36}$/,'a sender id is minted');
+  const senders=await (await fetch(app.base+'/x-nmos/node/v1.3/senders')).json();assert.equal(senders.length,1);assert.equal(senders[0].id,withVirtual.body.config.virtualSenders[0].senderId);
+  const manifest=await fetch(senders[0].manifest_href.replace(/^http:\/\/[^/]+/,app.base));assert.equal(manifest.status,200);assert.match(await manifest.text(),/m=audio/);
+  assert.equal((await api(app.base)).body.engine.virtualNode.enabled,true);
+  // Multicast probe: wrong token is dropped, correct hello is accepted and listed.
+  const WebSocket=(await import('ws')).default,token=(await api(app.base,'/api/setup')).body.config.probeToken;assert.match(token,/.{8,}/);
+  const bad=new WebSocket(app.base.replace('http','ws')+'/probe');bad.on('error',()=>{});await new Promise(r=>bad.on('open',()=>{bad.send(JSON.stringify({type:'hello',token:'wrong',name:'bad'}));bad.on('close',r);}));
+  const good=new WebSocket(app.base.replace('http','ws')+'/probe');good.on('error',()=>{});await new Promise(r=>good.on('open',r));good.send(JSON.stringify({type:'hello',token,name:'Studio probe'}));
+  await until(async()=>(await api(app.base)).body.engine.probes.some(p=>p.name==='Studio probe'),5000);good.terminate();
+  // Audio monitor: disabled by default, then gated on the optional native modules.
+  const off=await api(app.base,'/api/audio/subscribe',{senderId:'nmos_'+senders[0].id,listenerId:'lst_test'});assert.equal(off.status,409);
+  assert.equal((await api(app.base,'/api/setup',{audioMonitor:{enabled:true}})).status,200);
+  const on=await api(app.base,'/api/audio/subscribe',{senderId:'nmos_'+senders[0].id,listenerId:'lst_test'});
+  assert([200,503].includes(on.status),'subscribe: '+on.status+' '+JSON.stringify(on.body));if(on.status===503)assert.match(on.body.error,/not available|opus|werift|multicast/i);
+  assert.equal((await api(app.base,'/api/audio/unsubscribe',{listenerId:'lst_test'})).status,200);
 });

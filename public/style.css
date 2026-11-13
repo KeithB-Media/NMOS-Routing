@@ -146,3 +146,14 @@ button.health-button:hover{background:#ffffff12}
 .engine-log .log-line{display:grid;grid-template-columns:150px 70px 120px 1fr;gap:10px;padding:3px 6px;border-bottom:1px solid #1a1f26;color:#c1c9d2}
 .engine-log .log-line time{color:#8c95a1}
 .engine-log .log-line .sev-error{color:#ff8a8a}.engine-log .log-line .sev-warning{color:#ffc86b}.engine-log .log-line .sev-success{color:#8fd99a}.engine-log .log-line .sev-info{color:#9ab7e0}.engine-log .log-line .sev-verbose,.engine-log .log-line .sev-debug{color:#7f8893}
+/* Audio monitor */
+.audio-monitor{position:fixed;z-index:60;transform:translateY(-50%);background:#1c1f23;border:1px solid #424750;border-radius:10px;padding:10px 12px;min-width:260px;box-shadow:0 18px 60px #0009;font-size:11px;color:var(--text)}
+.audio-monitor .am-status{font-weight:600;margin-bottom:2px}
+.audio-monitor .am-name{color:#8c95a1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.audio-monitor .am-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.audio-monitor .am-controls label{display:flex;gap:4px;align-items:center}
+.audio-monitor select,.audio-monitor button{padding:3px 7px;border:1px solid #424750;border-radius:5px;background:#121416;color:var(--text);font:inherit}
+.audio-monitor input[type=range]{width:80px}
+button.listen-button{background:none;border:1px solid transparent;border-radius:5px;padding:1px 5px;cursor:pointer;color:#8c95a1;font-size:13px;line-height:1}
+button.listen-button:hover{border-color:#424750;color:var(--text)}
+button.listen-button.listening{color:var(--amber);border-color:var(--amber)}

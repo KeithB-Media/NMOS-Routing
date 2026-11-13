@@ -54,7 +54,7 @@ function demoBackend(state) {
     async enableSender(id, enabled) { const hit = find(id, 'senders'); if (!hit) throw new Error('Unknown sender.'); hit.flow.active = enabled; notify(); },
     async enableReceiver(id, enabled) { const hit = find(id, 'receivers'); if (!hit) throw new Error('Unknown receiver.'); hit.flow.active = enabled; notify(); },
     log: {getState: () => ({logList: [], lastLogId: 0})},
-    leases: null, settings: null, settingsFile: null, parseSettings: null,
+    leases: null, settings: null, settingsFile: null, parseSettings: null, audioMonitor: null, probe: null, upgradePaths: {}, probeState: () => null,
     // BCP-008 stand-in: counters for flows that carry a monitor in the demo state.
     bcp008: {
       async getPacketCounters(uuid) { for (const d of ['senders', 'receivers']) { const hit = find('nmos_' + uuid, d); if (hit?.flow.monitor) return [{label: hit.flow.monitor.status >= 3 ? 'Stream' : 'Link', counters: [{name: 'packets_received', value: 123456}, {name: 'packets_lost', value: hit.flow.monitor.status >= 3 ? 4210 : 0}, {name: 'packets_late', value: 0}]}]; } return null; },
@@ -87,13 +87,21 @@ const embedAncestors = (env.EMBED_ALLOWED_ORIGINS || '').split(',').map(value =>
 let backend;
 if (mode === 'live') {
   const {startEngine} = await import('./lib/engine.mjs');
-  backend = await startEngine({dir: path.resolve(env.ENGINE_DIR || path.join(dataDir, 'engine')), registry: env.NMOS_REGISTRY || undefined, registryPort: Number(env.NMOS_REGISTRY_PORT) || undefined, consoleLog: env.ENGINE_LOG === 'true'});
+  backend = await startEngine({dir: path.resolve(env.ENGINE_DIR || path.join(dataDir, 'engine')), registry: env.NMOS_REGISTRY || undefined, registryPort: Number(env.NMOS_REGISTRY_PORT) || undefined, port: Number(env.PORT || 8194), host: env.HOST || '0.0.0.0', consoleLog: env.ENGINE_LOG === 'true'});
   backend.mode = 'live';
 } else {
   backend = demoBackend(demoState());
   backend.settings = JSON.parse(await readFile(defaultSettingsPath, 'utf8')); // editable in memory; demo never writes a file
 }
 
+let nodeApp = null;
+if (backend.mountNodeApi) {
+  const express = (await import('express')).default;
+  nodeApp = express();
+  nodeApp.disable('x-powered-by');
+  backend.mountNodeApi(nodeApp);
+  nodeApp.use((req, res) => res.status(404).type('application/json').send('{"error":"Not found"}'));
+}
 let cache = {groups: [], routes: [], devices: [], aliasSets: [], totals: null, manualGroups: [], unresolved: []};
 let revision = Date.now(), inventoryHash = '', lastSync = null, syncError = mode === 'live' ? 'Waiting for the NMOS registry' : null;
 let liveHub = null, writeBusy = false, saveQueue = Promise.resolve(), refreshTimer = null, closed = false;
@@ -171,12 +179,14 @@ function logAction(type, text) {
   metadata.activity.unshift({id: randomUUID(), type, text, time: new Date().toISOString()});
   metadata.activity = metadata.activity.slice(0, 150);
 }
+function audioStatus() { return {enabled: !!backend.settings?.audioMonitor?.enabled, available: !!backend.audioMonitor}; }
 function engineStatus() {
   const registry = connectedRegistry();
-  return {mode, connected: !!registry, registry: registry ? {ip: registry.ip, port: registry.port, source: registry.source, priority: registry.priority, domain: registry.domain || ''} : null, registries: registries().map(r => ({ip: r.ip, port: r.port, source: r.source, priority: r.priority, connected: (r.connected || []).filter(c => c.connected).length})), totals: cache.totals, leases: backend.leases ? backend.leases.getStats() : null};
+  const probes = backend.probeState?.();
+  return {mode, connected: !!registry, probes: probes?.probes || probes?.list || [], audioMonitor: audioStatus(), virtualNode: {enabled: backend.settings?.virtualNode?.enabled === true, running: !!backend.nodeRegistration?.running}, registry: registry ? {ip: registry.ip, port: registry.port, source: registry.source, priority: registry.priority, domain: registry.domain || ''} : null, registries: registries().map(r => ({ip: r.ip, port: r.port, source: r.source, priority: r.priority, connected: (r.connected || []).filter(c => c.connected).length})), totals: cache.totals, leases: backend.leases ? backend.leases.getStats() : null};
 }
 function snapshot() {
-  return {...cache, metadata, mode, desktop: false, controllerUrl: registryQueryUrl(), canWrite, ephemeralState: env.EPHEMERAL_STATE === 'true', syncSeconds: 2, stream: {controller: 'live', reconciliationSeconds: 2}, engine: engineStatus(), lastSync, error: syncError, revision};
+  return {...cache, metadata, mode, desktop: false, controllerUrl: registryQueryUrl(), canWrite, ephemeralState: env.EPHEMERAL_STATE === 'true', syncSeconds: 2, stream: {controller: 'live', reconciliationSeconds: 2}, engine: engineStatus(), audioMonitor: audioStatus(), lastSync, error: syncError, revision};
 }
 function send(res, status, value, headers = {}) {
   res.writeHead(status, {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers});
@@ -208,7 +218,7 @@ async function applyAll(jobs) {
 const routed = (from, to) => cache.routes.some(r => r.from === from && r.to === to);
 
 const files = {'/': ['index.html', 'text/html'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/fonts/Lora.ttf': ['fonts/Lora.ttf', 'font/ttf'], '/fonts/CormorantGaramond.ttf': ['fonts/CormorantGaramond.ttf', 'font/ttf']};
-for (const name of ['app', 'matrix', 'name-series', 'workspace', 'column-sorter', 'column-resize', 'live-updates', 'route-options', 'route-feedback', 'search', 'themes', 'nmos-viewer', 'nmos-groups', 'panels', 'panel-model', 'setup']) files['/' + name + '.js'] = [name + '.js', 'text/javascript'];
+for (const name of ['app', 'matrix', 'name-series', 'workspace', 'column-sorter', 'column-resize', 'live-updates', 'route-options', 'route-feedback', 'search', 'themes', 'nmos-viewer', 'nmos-groups', 'panels', 'panel-model', 'setup', 'audio-monitor']) files['/' + name + '.js'] = [name + '.js', 'text/javascript'];
 for (const name of ['style', 'themes', 'panels']) files['/' + name + '.css'] = [name + '.css', 'text/css'];
 const staticCache = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([url, [name, type]]) => [url, {data: await readAsset('public/' + name), type}])));
 
@@ -219,6 +229,8 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors ${embed ? ["'self'", ...embedAncestors].join(' ') : "'none'"}; base-uri 'self'`);
   if (url.pathname === '/healthz') return send(res, 200, {status: 'ok', mode, registry: !!connectedRegistry()});
+  // The virtual NMOS node is queried by the registry and by other controllers: no operator auth, no CSP.
+  if (url.pathname === '/x-nmos' || url.pathname.startsWith('/x-nmos/')) { if (!nodeApp) return send(res, 404, {error: 'Virtual NMOS node is not available in demo mode'}); return nodeApp(req, res); }
   if (!authenticated(req)) return send(res, 401, {error: 'Operator login required'}, {'WWW-Authenticate': 'Basic realm="NMOS Routing"'});
   const crossSite = req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host);
   try {
@@ -298,6 +310,26 @@ const server = http.createServer(async (req, res) => {
         if (failures.length) return send(res, 502, {...snapshot(), error: failures.join(' '), routePending: true, disconnectedRoutes: removed.map(({from, to}) => ({from, to}))});
         return send(res, routePending ? 202 : 200, {...snapshot(), routePending, disconnectedRoutes: removed.map(({from, to}) => ({from, to}))});
       } finally { writeBusy = false; }
+    }
+    if (url.pathname.startsWith('/api/audio/')) {
+      const op = url.pathname.slice('/api/audio/'.length), listenerId = typeof data.listenerId === 'string' ? data.listenerId.slice(0, 64) : '';
+      if (!backend.audioMonitor) return send(res, 404, {error: 'The audio monitor is not available in demo mode.'});
+      if (!listenerId) throw new Error('listenerId required');
+      if (op === 'subscribe') {
+        if (!backend.settings?.audioMonitor?.enabled) return send(res, 409, {error: 'The audio monitor is disabled. Enable it on the Setup page.'});
+        if (typeof data.senderId !== 'string') throw new Error('senderId required');
+        const sdp = backend.senderSdp(data.senderId);
+        if (!sdp) return send(res, 404, {error: 'No SDP is cached for this sender.'});
+        const result = await backend.audioMonitor.subscribe({senderId: data.senderId.replace(/^nmos_/, ''), listenerId, sdp, channels: Array.isArray(data.channels) && data.channels.length === 2 ? data.channels.map(n => Number(n) | 0) : undefined});
+        if (!result?.ok) return send(res, 503, {error: result?.error || 'Audio monitor subscribe failed'});
+        const channels = Number(sdp.match(/a=rtpmap:\d+\s+\w+\/\d+\/(\d+)/)?.[1]) || 2;
+        return send(res, 200, {offer: result.offer, sourceChannels: channels});
+      }
+      if (op === 'answer') { const r = await backend.audioMonitor.answer(listenerId, data.answer); if (!r?.ok) return send(res, 400, {error: r?.error || 'Answer rejected'}); return send(res, 200, {}); }
+      if (op === 'ice') { if (data.candidate) backend.audioMonitor.ice(listenerId, data.candidate).catch(() => {}); return send(res, 200, {}); }
+      if (op === 'channels') { if (!Array.isArray(data.channels) || data.channels.length !== 2) throw new Error('channels[2] required'); return send(res, backend.audioMonitor.setChannels(listenerId, [Number(data.channels[0]) | 0, Number(data.channels[1]) | 0]) ? 200 : 404, {}); }
+      if (op === 'unsubscribe') { backend.audioMonitor.unsubscribe(listenerId).catch(() => {}); return send(res, 200, {}); }
+      return send(res, 404, {error: 'Not found'});
     }
     if (['/api/bcp008/counters', '/api/bcp008/reset'].includes(url.pathname)) {
       if (typeof data.id !== 'string') throw new Error('Flow id required');
@@ -382,7 +414,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, {error: 'Not found'});
   } catch (e) { return send(res, 400, {error: e.message}); }
 });
-liveHub = new LiveHub(server, {authenticated, snapshot});
+liveHub = new LiveHub(server, {authenticated, snapshot, upgrades: backend.upgradePaths || {}});
 await new Promise((resolve, reject) => { server.once('error', reject); server.listen(Number(env.PORT || 8194), env.HOST || '127.0.0.1', () => { server.removeListener('error', reject); resolve(); }); });
 async function close() {
   if (closed) return; closed = true;

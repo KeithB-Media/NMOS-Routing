@@ -10,6 +10,7 @@ import {attachColumnSorter} from './column-sorter.js?v=0.1.0';
 import {attachColumnResize} from './column-resize.js?v=0.1.0';
 import {createPanels} from './panels.js?v=0.1.0';
 import {createSetup} from './setup.js?v=0.1.0';
+import {createAudioMonitor} from './audio-monitor.js?v=0.1.0';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -195,7 +196,7 @@ function groupRow(r) {
     const content={
       expand:level?'':`<button class="row-expander${open?' open':''}" data-action="expand" data-id="${esc(g.id)}" aria-label="${open?'Collapse':'Expand'} ${label}" aria-expanded="${open}">${icon('chevron')}</button>`,
       favorite:level?'':`<button class="row-star${favorites.has(g.id)?' on':''}" data-action="favorite" data-id="${esc(g.id)}" aria-label="${favorites.has(g.id)?'Unfavorite':'Favorite'} ${label}" aria-pressed="${favorites.has(g.id)}">${icon('star')}</button>`,
-      name:`<span class="signal-name" ${!level&&state.canWrite?'tabindex="0" role="button" data-edit-name aria-label="Edit name for '+label+'" title="Click to select, click again to edit · Enter to edit"':''}>${level?`<i class="level-icon ${level.kind}"></i>${esc(level.name)}`:`<i class="small-dot${info.routed?' routed':''}"></i>${label}`}</span>`,
+      name:`<span class="signal-name" ${!level&&state.canWrite?'tabindex="0" role="button" data-edit-name aria-label="Edit name for '+label+'" title="Click to select, click again to edit · Enter to edit"':''}>${level?`<i class="level-icon ${level.kind}"></i>${esc(level.name)}`:`<i class="small-dot${info.routed?' routed':''}"></i>${label}`}</span>${level&&level.kind==='audio'&&g.side==='source'&&state?.audioMonitor?.enabled?`<button class="listen-button${audioMonitor.active===level.id?' listening':''}" data-action="listen" data-id="${esc(g.id)}" data-level="${esc(level.key)}" title="Listen in the browser (audio monitor)" aria-label="Listen to ${esc(level.name)}">🎧</button>`:''}`,
       system:esc(level?(level.flowName||level.key):g.system),alias:esc(alias)||'<span class="muted">—</span>',
       type:level?`<span class="muted">${level.kind==='video'?'Video':level.kind==='audio'?'Audio':'Ancillary'}</span>`:`<span class="type-badge${g.type==='Audio'?' audio':''}">${esc(g.type)}</span>`,
       current:routeCell(g,level),tags:level?'':tagCell(g),
@@ -395,6 +396,7 @@ $('#rows').onclick=async e=>{
   if(button.dataset.action==='tags') openTags(g,button);
   if(button.dataset.action==='sdp-menu')openSdpMenu(g,button.dataset.level,button);
   if(button.dataset.action==='health')openHealth(g,button.dataset.level);
+  if(button.dataset.action==='listen'){const level=g.levels.find(l=>l.key===button.dataset.level);if(level)await audioMonitor.toggle(g,level,button);}
 };
 
 function selectNameCell(cell){
@@ -695,6 +697,7 @@ const nmosView=createNmosViewer($('#nmos-view'),{
   onGroupCreated:result=>{accept(result.inventory);toast('Group confirmed');},
   onOpenGroup:result=>{const group=byId.get(result.groupId);if(!group)return;$('[data-view="routing"]').click();$('#tab-'+group.side).click();$('#clear-filters').click();query=group.name;$('#global-search').value=query;resetPage();renderRows();},
 });
+const audioMonitor=createAudioMonitor({toast});
 const setupView=createSetup($('#setup-view'),{toast,canWrite:()=>!!state?.canWrite,onSaved:()=>poll(true)});
 const panelsView=createPanels($('#panels-view'),{
   getData:()=>({state,groups,tags:g=>getTags(g)||[],policy:missingLevelPolicy}),
