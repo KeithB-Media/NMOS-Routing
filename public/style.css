@@ -96,3 +96,36 @@ html[data-layout="embed"] .embed-appearance{display:flex;align-items:center;gap:
 .group-actions-top{margin:0 0 8px}
 .group-filter{width:100%;margin-bottom:6px}
 dialog.group-dialog{width:960px;max-width:95vw}
+/* Setup view */
+.setup-panel{padding:22px 26px;overflow:auto}
+.setup-body .muted{color:#8c95a1}
+.setup-form{display:flex;flex-direction:column;gap:18px;max-width:1100px}
+.setup-section{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:#13171c;display:flex;flex-direction:column;gap:10px}
+.setup-section h3{margin:0;font-size:14px;font-weight:600}
+.setup-section h4{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8c95a1}
+.setup-section p{margin:0;font-size:11px;color:#9aa3ae;line-height:1.6}
+.setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.setup-field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#c1c9d2}
+.setup-field input,.setup-field select,.setup-field textarea,.setup-table input,.setup-table select{padding:7px 9px;border:1px solid #424750;border-radius:6px;background:#121416;color:var(--text);font:inherit;font-size:12px}
+.setup-field textarea{font-family:ui-monospace,monospace;font-size:11px}
+.setup-field small,.setup-check small{display:block;color:#8c95a1;font-size:10px;margin-top:2px}
+.setup-check{display:flex;gap:9px;align-items:flex-start;font-size:12px}
+.setup-check input{margin-top:3px}
+.setup-adopt{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;padding:8px 10px;border:1px dashed #5a4a2a;border-radius:7px;color:#ffd29b}
+.setup-table{width:100%;border-collapse:collapse;font-size:11px}
+.setup-table th{text-align:left;color:#8c95a1;font-weight:500;padding:5px 7px;border-bottom:1px solid var(--line)}
+.setup-table td{padding:5px 7px;border-bottom:1px solid #1f242b;vertical-align:middle}
+.setup-table input,.setup-table select{width:100%;padding:4px 7px}
+.setup-lease-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.setup-lease-head span{display:flex;gap:6px;align-items:center}
+.setup-file{cursor:pointer}
+.setup-ok{color:#8fd99a}.setup-warn{color:#ffd29b}
+.danger-text{color:#ff9d9d}
+.setup-details summary{cursor:pointer;font-size:11px;color:#c1c9d2}
+.setup-virtual{border:1px solid #1f242b;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.setup-actions{display:flex;align-items:center;gap:14px;font-size:11px}
+.setup-actions .primary{background:var(--amber);color:#111;border:0;border-radius:7px;padding:9px 16px;font-weight:600}
+.setup-actions .primary:disabled{opacity:.5}
+.nmos-panel .setup-check{flex-direction:row;align-items:flex-start;gap:9px}
+.nmos-panel .setup-check input,.nmos-panel .setup-adopt input{width:auto;padding:0;margin:3px 0 0;flex:none;height:auto}
+.nmos-panel .setup-adopt label{flex-direction:row;align-items:center;gap:6px}

@@ -9,6 +9,7 @@ import {workspaceColumns,columnLayout,aliasText,namedGroup,networkValues} from '
 import {attachColumnSorter} from './column-sorter.js?v=0.1.0';
 import {attachColumnResize} from './column-resize.js?v=0.1.0';
 import {createPanels} from './panels.js?v=0.1.0';
+import {createSetup} from './setup.js?v=0.1.0';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -45,6 +46,7 @@ $('.rail-button[data-view="matrix"]').innerHTML=icon('matrix');
 $('.rail-button[data-view="activity"]').innerHTML=icon('activity');
 $('.rail-button[data-view="nmos"]').innerHTML=icon('route');
 $('.rail-button[data-view="panels"]').innerHTML=icon('grid');
+$('.rail-button[data-view="setup"]').innerHTML=icon('settings');
 $('#settings').innerHTML=icon('settings');$('#density').innerHTML=icon('density');$('#refresh').innerHTML=icon('refresh');
 $('#columns').innerHTML=icon('settings');$('#columns').className='icon-button';
 $('#columns').setAttribute('aria-label','Columns');$('#columns').title='Choose and reorder columns';
@@ -685,12 +687,13 @@ window.addEventListener('resize',()=>closePopover());
 
 function renderActivity() {
   if(!state)return;
-  $('#activity-list').innerHTML=state.metadata.activity.length?state.metadata.activity.map(a=>`<div class="activity-item">${icon(a.type==='route'?'route':'tag')}<div><strong>${esc(a.text)}</strong><small>${a.type==='route'?'Route change':'Tag update'} · ${state.mode==='demo'?'demo facility':'live NMOS facility'}</small></div><time>${esc(new Date(a.time).toLocaleString())}</time></div>`).join(''):'<div class="empty-state"><strong>No activity yet</strong><span>Your route changes and tag edits will appear here.</span></div>';
+  $('#activity-list').innerHTML=state.metadata.activity.length?state.metadata.activity.map(a=>`<div class="activity-item">${icon(a.type==='route'?'route':'tag')}<div><strong>${esc(a.text)}</strong><small>${a.type==='route'?'Route change':a.type==='setup'?'Settings':a.type==='group'?'Manual group':a.type==='name'?'Name change':'Tag update'} · ${state.mode==='demo'?'demo facility':'live NMOS facility'}</small></div><time>${esc(new Date(a.time).toLocaleString())}</time></div>`).join(''):'<div class="empty-state"><strong>No activity yet</strong><span>Your route changes and tag edits will appear here.</span></div>';
 }
 const nmosView=createNmosViewer($('#nmos-view'),{
   onGroupCreated:result=>{accept(result.inventory);toast('Group confirmed');},
   onOpenGroup:result=>{const group=byId.get(result.groupId);if(!group)return;$('[data-view="routing"]').click();$('#tab-'+group.side).click();$('#clear-filters').click();query=group.name;$('#global-search').value=query;resetPage();renderRows();},
 });
+const setupView=createSetup($('#setup-view'),{toast,canWrite:()=>!!state?.canWrite,onSaved:()=>poll(true)});
 const panelsView=createPanels($('#panels-view'),{
   getData:()=>({state,groups,tags:g=>getTags(g)||[],policy:missingLevelPolicy}),
   onTake:(source,destination,plan)=>applyRoute(source,destination,{},plan),
@@ -699,6 +702,7 @@ const panelsView=createPanels($('#panels-view'),{
 $$('button[data-view]').forEach(b=>b.onclick=()=>{
   const routing=['routing','matrix'].includes(b.dataset.view);
   $('#routing-view').hidden=!routing;$('#activity-view').hidden=b.dataset.view!=='activity';$('#nmos-view').hidden=b.dataset.view!=='nmos';
+  $('#setup-view').hidden=b.dataset.view!=='setup';setupView.setVisible(b.dataset.view==='setup');
   $('#panels-view').hidden=b.dataset.view!=='panels';panelsView.setVisible(b.dataset.view==='panels');
   if(b.dataset.view==='panels')history.replaceState(null,'',location.pathname+location.search+'#panels');
   else if(location.hash==='#panels')history.replaceState(null,'',location.pathname+location.search);

@@ -8,6 +8,7 @@
 | `lib/engine.mjs` | Boots the vendored engine in-process (replaces upstream `server.ts`): settings, registry connector, crosspoint worker, lease manager, DDNS, BCP-008. Exposes `connect/disconnect/changeAlias/toggleHidden/enable*` and `onState`. |
 | `lib/nmos-model.mjs` | Adapter: engine `CrosspointState` → Route Desk `{groups, routes, devices}`; SDP lookup for the popup. |
 | `lib/manual-groups.mjs` | Operator-defined groups: validation, persistence, overlay onto the adapter inventory. |
+| `lib/setup.mjs` | Setup page semantics: safe settings view, validation, hot-apply to engine services, settings.json persistence, lease snapshot. |
 | `lib/model.mjs` | Routing planners (full take, breakaway, missing-level policy, disconnect) and name validation. Backend-agnostic. |
 | `lib/demo-state.mjs` | Generated demo facility (`ROUTING_MODE=demo`). |
 | `lib/live-hub.mjs` | Browser WebSocket deltas (unchanged from Route Desk). |
@@ -54,10 +55,9 @@ indicator until the registry push arrives.
    columns from `level.network`.
 2. ~~Manual group builder~~ — done: `lib/manual-groups.mjs`, `/api/groups`,
    Groups dialog. Flows claimed by a manual group leave their automatic group.
-3. **Setup page** — registry (static/DNS-SD), acceptable GMID, multicast DHCP
-   + lease inventory, vendor Web-UI links, virtual senders, DDNS, BCP-008 and
-   audio monitor toggles; writes `settings.json` through the engine's
-   `setupConfig` semantics.
+3. ~~Setup page~~ — done: `lib/setup.mjs` (port of upstream setupConfig),
+   `public/setup.js`. Virtual-node registration and the audio monitor only
+   take effect once those services are mounted (item 5/6).
 4. ~~BCP-007-03 (MXL)~~ — done. Engine: `connectionGetSenderInfo` reads
    `mxl_domain_id`/`mxl_flow_id` from the sender's IS-05 active params,
    `makeConnection` sends them with no `transport_file` and refuses RTP/MXL

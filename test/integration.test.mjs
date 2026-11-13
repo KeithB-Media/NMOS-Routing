@@ -154,4 +154,11 @@ test('live server boots the crosspoint engine in-process, reports a missing regi
   const settings=JSON.parse(await (await import('node:fs/promises')).readFile(path.join(dataDir,'engine','config','settings.json'),'utf8'));
   assert.deepEqual(settings.staticNmosRegistries,[{ip:'127.0.0.1',port:1,priority:10,domain:''}]);assert.equal(settings.logOutput,false);
   assert.equal((await fetch(app.base+'/healthz')).status,200);
+  // Setup page: a registry change is written to settings.json and hot-applied to the connector.
+  const setup=await api(app.base,'/api/setup');assert.equal(setup.status,200);assert.equal(setup.body.config.registry.ip,'127.0.0.1');assert.equal(setup.body.config.settingsFile,path.join(dataDir,'engine','config','settings.json'));
+  const changed=await api(app.base,'/api/setup',{registry:{ip:'127.0.0.2',port:2},acceptableGmid:'00-1d-c1-ff-fe-00-00-01',bcp008:{enabled:false}});
+  assert.equal(changed.status,200);assert.deepEqual(changed.body.changed,['acceptableGmid','bcp008','registry']);
+  const written=JSON.parse(await (await import('node:fs/promises')).readFile(path.join(dataDir,'engine','config','settings.json'),'utf8'));
+  assert.deepEqual(written.staticNmosRegistries[0],{ip:'127.0.0.2',port:2,priority:10,domain:''});assert.equal(written.acceptableGmid,'00-1D-C1-FF-FE-00-00-01');assert.equal(written.bcp008.enabled,false);
+  await until(async()=>(await api(app.base)).body.engine.registries.some(r=>r.ip==='127.0.0.2'&&r.port===2),10000);
 });

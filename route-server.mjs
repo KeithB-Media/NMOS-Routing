@@ -14,6 +14,8 @@ import {createHash, timingSafeEqual, randomUUID} from 'node:crypto';
 import {planRoute, planDisconnect, planMissingDisconnect, validateNameChanges} from './lib/model.mjs';
 import {inventoryOf, sdpCacheOf} from './lib/nmos-model.mjs';
 import {ManualGroupStore, applyManualGroups, flowCatalog} from './lib/manual-groups.mjs';
+import {setupState, applySetup, leaseSnapshot} from './lib/setup.mjs';
+import {defaultSettingsPath} from './lib/engine.mjs';
 import {demoState} from './lib/demo-state.mjs';
 import {LiveHub} from './lib/live-hub.mjs';
 import {sdpView} from './lib/stream-cache.mjs';
@@ -52,7 +54,7 @@ function demoBackend(state) {
     async enableSender(id, enabled) { const hit = find(id, 'senders'); if (!hit) throw new Error('Unknown sender.'); hit.flow.active = enabled; notify(); },
     async enableReceiver(id, enabled) { const hit = find(id, 'receivers'); if (!hit) throw new Error('Unknown receiver.'); hit.flow.active = enabled; notify(); },
     log: {getState: () => ({logList: [], lastLogId: 0})},
-    leases: null,
+    leases: null, settings: null, settingsFile: null, parseSettings: null,
     async close() {},
   };
 }
@@ -82,7 +84,10 @@ if (mode === 'live') {
   const {startEngine} = await import('./lib/engine.mjs');
   backend = await startEngine({dir: path.resolve(env.ENGINE_DIR || path.join(dataDir, 'engine')), registry: env.NMOS_REGISTRY || undefined, registryPort: Number(env.NMOS_REGISTRY_PORT) || undefined, consoleLog: env.ENGINE_LOG === 'true'});
   backend.mode = 'live';
-} else backend = demoBackend(demoState());
+} else {
+  backend = demoBackend(demoState());
+  backend.settings = JSON.parse(await readFile(defaultSettingsPath, 'utf8')); // editable in memory; demo never writes a file
+}
 
 let cache = {groups: [], routes: [], devices: [], aliasSets: [], totals: null, manualGroups: [], unresolved: []};
 let revision = Date.now(), inventoryHash = '', lastSync = null, syncError = mode === 'live' ? 'Waiting for the NMOS registry' : null;
@@ -198,7 +203,7 @@ async function applyAll(jobs) {
 const routed = (from, to) => cache.routes.some(r => r.from === from && r.to === to);
 
 const files = {'/': ['index.html', 'text/html'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/fonts/Lora.ttf': ['fonts/Lora.ttf', 'font/ttf'], '/fonts/CormorantGaramond.ttf': ['fonts/CormorantGaramond.ttf', 'font/ttf']};
-for (const name of ['app', 'matrix', 'name-series', 'workspace', 'column-sorter', 'column-resize', 'live-updates', 'route-options', 'route-feedback', 'search', 'themes', 'nmos-viewer', 'nmos-groups', 'panels', 'panel-model']) files['/' + name + '.js'] = [name + '.js', 'text/javascript'];
+for (const name of ['app', 'matrix', 'name-series', 'workspace', 'column-sorter', 'column-resize', 'live-updates', 'route-options', 'route-feedback', 'search', 'themes', 'nmos-viewer', 'nmos-groups', 'panels', 'panel-model', 'setup']) files['/' + name + '.js'] = [name + '.js', 'text/javascript'];
 for (const name of ['style', 'themes', 'panels']) files['/' + name + '.css'] = [name + '.css', 'text/css'];
 const staticCache = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([url, [name, type]]) => [url, {data: await readAsset('public/' + name), type}])));
 
@@ -219,6 +224,8 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, url.pathname === '/api/nmos' ? {...await viewer.inventory(), engineRegistry: registryQueryUrl(), groupCreationAvailable: false, canCreateGroups: false} : await viewer.detail(url.searchParams.get('node'), url.searchParams.get('type'), url.searchParams.get('id')));
     }
     if (req.method === 'GET' && url.pathname === '/api/sdp') return send(res, 200, sdpView(cache.groups, cache.routes, sdpCacheOf(backend.state(), backend.nmosState()), {groupId: url.searchParams.get('groupId'), levelKey: url.searchParams.get('levelKey') || undefined, view: url.searchParams.get('view'), side: url.searchParams.get('side')}));
+    if (req.method === 'GET' && url.pathname === '/api/setup') return send(res, 200, {config: setupState(backend), leases: leaseSnapshot(backend), detectedDevices: backend.state()?.detectedDevices || [], dnsPushed: backend.ddns ? backend.ddns.getPushedEntries() : [], registries: registries(), dnssd: backend.connectionState()?.dnssd || null});
+    if (req.method === 'GET' && url.pathname === '/api/leases/export') return send(res, 200, backend.leases ? backend.leases.exportLeases() : {version: 1, leases: {}});
     if (req.method === 'GET' && url.pathname === '/api/groups') return send(res, 200, {groups: manualGroups.groups, unresolved: cache.unresolved, catalog: flowCatalog(backend.state())});
     if (req.method === 'GET' && url.pathname === '/api/engine') {
       const after = Number(url.searchParams.get('after') || 0), log = backend.log?.getState?.()?.logList || [];
@@ -300,6 +307,29 @@ const server = http.createServer(async (req, res) => {
       writeBusy = true;
       try { await (data.direction === 'sender' ? backend.enableSender(data.id, data.enabled) : backend.enableReceiver(data.id, data.enabled)); logAction('route', `${data.enabled ? 'Enabled' : 'Disabled'} ${data.direction} ${data.id}`); revision++; await persist(); liveHub?.publish(); return send(res, 202, snapshot()); }
       finally { writeBusy = false; }
+    }
+    if (url.pathname === '/api/setup') {
+      if (!canWrite) return send(res, 403, {error: 'Settings are read-only. Set WRITE_ENABLED=true on the server.'});
+      const result = await applySetup(backend, data);
+      logAction('setup', 'Updated engine settings' + (result.changed.length ? ' · ' + result.changed.join(', ') : ''));
+      refresh(); revision++; await persist(); liveHub?.publish();
+      return send(res, 200, {...result, leases: leaseSnapshot(backend)});
+    }
+    if (url.pathname === '/api/leases/release') {
+      if (!canWrite) return send(res, 403, {error: 'Settings are read-only. Set WRITE_ENABLED=true on the server.'});
+      if (!backend.leases) throw new Error('Lease manager is not available in demo mode.');
+      const ids = data.all === true ? Object.keys(backend.leases.getAllLeases()) : typeof data.senderId === 'string' && data.senderId.trim() ? [data.senderId.trim()] : [];
+      if (!ids.length) throw new Error('senderId or all:true required');
+      backend.leases.releaseLeases(ids);
+      logAction('setup', `Released ${ids.length} multicast lease${ids.length === 1 ? '' : 's'}`);
+      return send(res, 200, {released: ids.length, leases: leaseSnapshot(backend)});
+    }
+    if (url.pathname === '/api/leases/import') {
+      if (!canWrite) return send(res, 403, {error: 'Settings are read-only. Set WRITE_ENABLED=true on the server.'});
+      if (!backend.leases) throw new Error('Lease manager is not available in demo mode.');
+      const result = backend.leases.importLeases(data);
+      logAction('setup', `Imported ${result.imported} multicast leases`);
+      return send(res, 200, {...result, leases: leaseSnapshot(backend)});
     }
     if (url.pathname === '/api/groups') {
       // Manual groups are local metadata: allowed even when device writes are off.

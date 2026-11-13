@@ -22,5 +22,11 @@ nmos-crosspoint v3 engine (vendored, MIT).
   file, refuses RTP/MXL mixes; the UI shows the MXL domain/flow in the address
   columns and the planners explain transport mismatches. Engine changes are
   marked and listed in `packages/crosspoint-engine/UPSTREAM-PATCHES.md`.
-- Tests: 73 passing, including IS-05 PATCH-body tests against a mock node and
+- Setup page (rail): registry + DNS-SD discovery, acceptable PTP GMID, routing
+  behaviour, multicast DHCP with adopt/renew and the lease inventory
+  (release, export, import), vendor web-UI profiles with detected devices,
+  virtual senders, DDNS (TSIG secret never echoed), BCP-008 and audio-monitor
+  toggles. `/api/setup`, `/api/leases/*`; writes the engine settings.json and
+  hot-applies registry, lease, DDNS and BCP-008 changes.
+- Tests: 78 passing, including IS-05 PATCH-body tests against a mock node and
   a live-mode engine boot test.
