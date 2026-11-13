@@ -13,6 +13,7 @@ import path from 'node:path';
 import {createHash, timingSafeEqual, randomUUID} from 'node:crypto';
 import {planRoute, planDisconnect, planMissingDisconnect, validateNameChanges} from './lib/model.mjs';
 import {inventoryOf, sdpCacheOf} from './lib/nmos-model.mjs';
+import {ManualGroupStore, applyManualGroups, flowCatalog} from './lib/manual-groups.mjs';
 import {demoState} from './lib/demo-state.mjs';
 import {LiveHub} from './lib/live-hub.mjs';
 import {sdpView} from './lib/stream-cache.mjs';
@@ -66,6 +67,8 @@ const stateFile = path.join(dataDir, `${mode}-state.json`);
 let saved;
 try { saved = JSON.parse(await readFile(stateFile, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 let metadata = saved?.metadata || {tags: {}, favorites: [], tagLibrary: [], activity: []};
+const manualGroups = new ManualGroupStore(path.join(dataDir, `${mode}-groups.json`));
+await manualGroups.load();
 const canWrite = mode === 'demo' || env.WRITE_ENABLED === 'true';
 const embedAncestors = (env.EMBED_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean).map(value => {
   const origin = new URL(value);
@@ -81,7 +84,7 @@ if (mode === 'live') {
   backend.mode = 'live';
 } else backend = demoBackend(demoState());
 
-let cache = {groups: [], routes: [], devices: [], aliasSets: [], totals: null};
+let cache = {groups: [], routes: [], devices: [], aliasSets: [], totals: null, manualGroups: [], unresolved: []};
 let revision = Date.now(), inventoryHash = '', lastSync = null, syncError = mode === 'live' ? 'Waiting for the NMOS registry' : null;
 let liveHub = null, writeBusy = false, saveQueue = Promise.resolve(), refreshTimer = null, closed = false;
 const stateWaiters = new Set();
@@ -95,7 +98,7 @@ function registryQueryUrl(registry = connectedRegistry()) {
 }
 
 function refresh() {
-  const next = inventoryOf(backend.state());
+  const next = applyManualGroups(inventoryOf(backend.state()), manualGroups.groups);
   const nextHash = createHash('sha256').update(JSON.stringify(next)).digest('hex');
   const changed = nextHash !== inventoryHash;
   if (changed) { cache = next; inventoryHash = nextHash; revision++; }
@@ -216,6 +219,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, url.pathname === '/api/nmos' ? {...await viewer.inventory(), engineRegistry: registryQueryUrl(), groupCreationAvailable: false, canCreateGroups: false} : await viewer.detail(url.searchParams.get('node'), url.searchParams.get('type'), url.searchParams.get('id')));
     }
     if (req.method === 'GET' && url.pathname === '/api/sdp') return send(res, 200, sdpView(cache.groups, cache.routes, sdpCacheOf(backend.state(), backend.nmosState()), {groupId: url.searchParams.get('groupId'), levelKey: url.searchParams.get('levelKey') || undefined, view: url.searchParams.get('view'), side: url.searchParams.get('side')}));
+    if (req.method === 'GET' && url.pathname === '/api/groups') return send(res, 200, {groups: manualGroups.groups, unresolved: cache.unresolved, catalog: flowCatalog(backend.state())});
     if (req.method === 'GET' && url.pathname === '/api/engine') {
       const after = Number(url.searchParams.get('after') || 0), log = backend.log?.getState?.()?.logList || [];
       return send(res, 200, {...engineStatus(), connection: backend.connectionState(), log: log.filter(l => l.id > after).slice(-200).map(({id, time, severity, topic, text}) => ({id, time, severity, topic, text}))});
@@ -296,6 +300,20 @@ const server = http.createServer(async (req, res) => {
       writeBusy = true;
       try { await (data.direction === 'sender' ? backend.enableSender(data.id, data.enabled) : backend.enableReceiver(data.id, data.enabled)); logAction('route', `${data.enabled ? 'Enabled' : 'Disabled'} ${data.direction} ${data.id}`); revision++; await persist(); liveHub?.publish(); return send(res, 202, snapshot()); }
       finally { writeBusy = false; }
+    }
+    if (url.pathname === '/api/groups') {
+      // Manual groups are local metadata: allowed even when device writes are off.
+      const group = manualGroups.upsert(data.group, flowCatalog(backend.state()));
+      await manualGroups.persist(); refresh();
+      logAction('group', `${data.group?.id ? 'Updated' : 'Created'} manual group ${group.name}`);
+      revision++; await persist(); liveHub?.publish(); return send(res, 200, {...snapshot(), group});
+    }
+    if (url.pathname === '/api/groups/delete') {
+      if (typeof data.id !== 'string') throw new Error('Group id required');
+      const removed = manualGroups.remove(data.id);
+      await manualGroups.persist(); refresh();
+      logAction('group', `Deleted manual group ${removed.name}`);
+      revision++; await persist(); liveHub?.publish(); return send(res, 200, snapshot());
     }
     if (url.pathname === '/api/tags') {
       if (!cache.groups.some(g => g.id === data.id)) throw new Error('Unknown group');

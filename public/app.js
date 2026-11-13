@@ -709,7 +709,7 @@ $$('button[data-view]').forEach(b=>b.onclick=()=>{
 $('.rail-button[data-view="'+(routingLayout==='matrix'?'matrix':'routing')+'"]').classList.add('active');
 if(routingLayout==='matrix')$('.rail-button[data-view="routing"]').classList.remove('active');
 if(location.hash==='#panels')$('.rail-button[data-view="panels"]').click();
-function showDialog(content){closePopover();$('#info-dialog').classList.remove('sdp-dialog');$('#dialog-content').innerHTML=content;if(!$('#info-dialog').open)$('#info-dialog').showModal();}
+function showDialog(content){closePopover();$('#info-dialog').classList.remove('sdp-dialog','group-dialog');$('#dialog-content').innerHTML=content;if(!$('#info-dialog').open)$('#info-dialog').showModal();}
 function showColumns() {
   closePopover();const anchor=$('#columns');pop={kind:'columns',anchor};anchor.setAttribute('aria-expanded','true');
   renderColumnMenu();positionPopover(anchor,265);
@@ -744,6 +744,44 @@ $('#settings').onclick=()=>{
   showDialog(`<div class="eyebrow">SETTINGS</div><h2>Your routing workspace</h2>${appearance}<label class="setting-label" for="missing-level-policy">Missing levels when routing a group</label><select id="missing-level-policy"><option value="disconnect" ${missingLevelPolicy==='disconnect'?'selected':''}>Disconnect missing levels (default)</option><option value="keep" ${missingLevelPolicy==='keep'?'selected':''}>Keep existing routes</option></select><p class="setting-help">Applies when a source lacks a destination content ID. Saved in this browser across refreshes and reloads.</p><dl><dt>Service address</dt><dd><code>${esc(location.origin)}</code></dd><dt>Panel URL</dt><dd><code>${esc(location.origin)}/embed</code></dd><dt>Browser updates</dt><dd>${browserLive?'WebSocket':'HTTP fallback · every 1s'}</dd><dt>Engine updates</dt><dd>${state?.stream?.controller==='live'?'Registry WebSocket push':'Polling every '+(state?.syncSeconds||5)+'s'}</dd><dt>Safety refresh</dt><dd>Every ${state?.stream?.reconciliationSeconds||state?.syncSeconds||5}s</dd><dt>Last synchronization</dt><dd>${state?.lastSync?esc(new Date(state.lastSync).toLocaleString()):'Not yet synchronized'}</dd><dt>Routing</dt><dd>${state?.canWrite?'Enabled':'Read-only'}</dd><dt>Search</dt><dd>Local browser cache · no API calls while typing</dd><dt>Tags</dt><dd>${state?.ephemeralState?'Memory only · resets on restart':'Persistent shared metadata'}</dd></dl><p class="dialog-note">Registry discovery and engine settings are configured on the server. Changes to sources, destinations, and routes are picked up automatically.</p>`);
   $('#missing-level-policy').onchange=e=>{missingLevelPolicy=e.target.value;localStorage.setItem('nmos-missing-level-policy',missingLevelPolicy);toast('Missing levels: '+(missingLevelPolicy==='keep'?'keep existing routes':'disconnect'));};
 };
+// ---- Manual routing groups ----
+const groupBuilder={groups:[],catalog:[],unresolved:[],draft:null,filter:''};
+function groupDraft(group){return group?{id:group.id,side:group.side,name:group.name,levels:group.levels.map(l=>l.flowId)}:{id:null,side:'destination',name:'',levels:[]};}
+function renderGroupBuilder(){
+  const b=groupBuilder,d=b.draft,byId=new Map(b.catalog.map(f=>[f.id,f]));
+  const claimed=new Map(b.groups.filter(g=>g.id!==d.id).flatMap(g=>g.levels.map(l=>[l.flowId,g.name])));
+  const counters={};const chosen=d.levels.map(id=>{const f=byId.get(id);const type=f?.type||'unknown';counters[type]=(counters[type]||0)+1;return {f,id,key:type+'-'+counters[type]};});
+  const query=b.filter.trim().toLowerCase();
+  const available=b.catalog.filter(f=>f.side===d.side&&!d.levels.includes(f.id)&&(!query||(f.name+' '+f.deviceName+' '+f.flowName).toLowerCase().includes(query))).slice(0,300);
+  const list=b.groups.length?b.groups.map(g=>'<button type="button" data-group="'+esc(g.id)+'" class="'+(g.id===d.id?'selected':'')+'"><strong>'+esc(g.name)+'</strong><small>'+(g.side==='source'?'Source':'Destination')+' · '+g.levels.length+' flow'+(g.levels.length===1?'':'s')+(b.unresolved.some(u=>u.id===g.id)?' · flows missing':'')+'</small></button>').join(''):'<div class="group-empty">No manual groups yet. Automatic groups follow NMOS devices and BCP-002-01 grouphints.</div>';
+  const chosenMarkup=chosen.map((c,i)=>'<li><span class="flow-key">'+esc(c.key)+'</span><span class="flow-meta"><span>'+esc(c.f?.name||c.id)+'</span><span>'+esc(c.f?.deviceName||'missing flow')+'</span></span><button type="button" data-move="'+i+'" data-dir="-1" aria-label="Move up"'+(i?'':' disabled')+'>↑</button><button type="button" data-move="'+i+'" data-dir="1" aria-label="Move down"'+(i<chosen.length-1?'':' disabled')+'>↓</button><button type="button" data-remove="'+i+'" aria-label="Remove">×</button></li>').join('')||'<li class="group-empty">Add flows from the right.</li>';
+  const availableMarkup=available.map(f=>'<li><span class="flow-meta"><span>'+esc(f.name)+'</span><span>'+esc(f.deviceName)+' · '+esc(f.kind)+(claimed.has(f.id)?' · in '+esc(claimed.get(f.id)):'')+'</span></span><button type="button" data-add="'+esc(f.id)+'"'+(claimed.has(f.id)?' disabled title="Already in another manual group"':'')+'>Add</button></li>').join('')||'<li class="group-empty">No matching flows.</li>';
+  $('#dialog-content').innerHTML='<div class="eyebrow">ROUTING GROUPS</div><h2>Manual groups</h2><p>Combine any flows into a routable group. A flow you claim here leaves its automatic group; deleting the manual group returns it. Nothing is written to devices.</p>'
+    +'<div class="group-builder"><div><div class="group-actions group-actions-top"><button type="button" class="quiet-button" id="group-new">+ New group</button></div><div class="group-list">'+list+'</div></div>'
+    +'<form class="group-form" id="group-form"><label>Name<input name="name" maxlength="120" required value="'+esc(d.name)+'" placeholder="e.g. Studio A wall"></label>'
+    +'<label>Side<select name="side"'+(d.levels.length?' disabled':'')+'><option value="destination"'+(d.side==='destination'?' selected':'')+'>Destination (receivers)</option><option value="source"'+(d.side==='source'?' selected':'')+'>Source (senders)</option></select>'+(d.levels.length?'<small>Remove all flows to change the side.</small>':'')+'</label>'
+    +'<div class="group-pick"><div><h4>Levels · '+chosen.length+'</h4><ol id="group-chosen">'+chosenMarkup+'</ol></div>'
+    +'<div><h4>Available '+(d.side==='source'?'senders':'receivers')+'</h4><input id="group-filter" placeholder="Filter by flow or device…" value="'+esc(b.filter)+'" autocomplete="off" class="group-filter"><ul>'+availableMarkup+'</ul></div></div>'
+    +'<div class="group-actions"><button type="submit" class="primary">'+(d.id?'Save group':'Create group')+'</button><span id="group-status" role="status"></span>'+(d.id?'<button type="button" class="danger" id="group-delete">Delete group</button>':'')+'</div></form></div>';
+  $('#group-new').onclick=()=>{b.draft=groupDraft(null);b.filter='';renderGroupBuilder();};
+  for(const el of $$('#dialog-content [data-group]'))el.onclick=()=>{b.draft=groupDraft(b.groups.find(g=>g.id===el.dataset.group));b.filter='';renderGroupBuilder();};
+  for(const el of $$('#dialog-content [data-add]'))el.onclick=()=>{d.levels.push(el.dataset.add);renderGroupBuilder();$('#group-filter').focus();};
+  for(const el of $$('#dialog-content [data-remove]'))el.onclick=()=>{d.levels.splice(Number(el.dataset.remove),1);renderGroupBuilder();};
+  for(const el of $$('#dialog-content [data-move]'))el.onclick=()=>{const i=Number(el.dataset.move),j=i+Number(el.dataset.dir);[d.levels[i],d.levels[j]]=[d.levels[j],d.levels[i]];renderGroupBuilder();};
+  const filter=$('#group-filter');filter.oninput=()=>{b.filter=filter.value;const pos=filter.selectionStart;renderGroupBuilder();const next=$('#group-filter');next.focus();next.setSelectionRange(pos,pos);};
+  const form=$('#group-form');form.elements.name.oninput=()=>{d.name=form.elements.name.value;};form.elements.side.onchange=()=>{d.side=form.elements.side.value;renderGroupBuilder();};
+  form.onsubmit=async e=>{e.preventDefault();d.name=form.elements.name.value;$('#group-status').textContent='Saving…';
+    const ok=await mutate('/api/groups',{group:{id:d.id||undefined,side:d.side,name:d.name,levels:d.levels}});
+    if(ok){toast(d.id?'Group saved':'Group created');await loadGroupBuilder(state?.manualGroups?.find(g=>g.name===d.name&&g.side===d.side)?.id||null);}else $('#group-status').textContent='';};
+  if($('#group-delete'))$('#group-delete').onclick=async()=>{if(!confirm('Delete manual group "'+d.name+'"? Its flows return to their automatic groups.'))return;if(await mutate('/api/groups/delete',{id:d.id})){toast('Group deleted');await loadGroupBuilder(null);}};
+}
+async function loadGroupBuilder(selectId){
+  try{const response=await fetch('/api/groups',{signal:AbortSignal.timeout(10000)}),data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load groups');
+    Object.assign(groupBuilder,{groups:data.groups,catalog:data.catalog,unresolved:data.unresolved});
+    groupBuilder.draft=groupDraft(selectId?data.groups.find(g=>g.id===selectId):null);renderGroupBuilder();
+  }catch(e){toast(e.message,true);}
+}
+$('#manual-groups').onclick=()=>{groupBuilder.filter='';showDialog('<div class="eyebrow">ROUTING GROUPS</div><h2>Manual groups</h2><p>Loading…</p>');$('#info-dialog').classList.add('group-dialog');loadGroupBuilder(null);};
 $('#refresh').onclick=async()=>{if(polling)return;polling=true;$('#refresh').classList.add('spin');await mutate('/api/sync',{});$('#refresh').classList.remove('spin');polling=false;if(!state?.error)toast('Inventory synchronized');};
 async function poll(force=false) {
   if(force)etag='';

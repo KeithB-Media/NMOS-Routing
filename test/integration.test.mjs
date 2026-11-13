@@ -93,6 +93,41 @@ test('demo server: inventory, ETag caching, routing with missing-level policy, b
   assert.equal(restored.groups.find(g=>g.id===mon.id).name,'MON 2');
 });
 
+test('manual groups overlay automatic groups, route like any group, survive restart and release flows on delete',async t=>{
+  const dataDir=await tempDir('groups-');
+  let app;
+  t.after(async()=>{await app?.stop();await cleanup(dataDir);});
+  app=await start({DATA_DIR:dataDir,ROUTING_MODE:'demo',UI_PASSWORD:''});
+  const listing=await api(app.base,'/api/groups');assert.equal(listing.status,200);assert.deepEqual(listing.body.groups,[]);
+  const mv1=listing.body.catalog.filter(f=>f.deviceId==='nmosgrp_mv1'),mv2=listing.body.catalog.filter(f=>f.deviceId==='nmosgrp_mv2');
+  assert.deepEqual(mv1.map(f=>[f.side,f.kind]),[['destination','video'],['destination','audio']]);
+  // Wrong side is rejected; nothing is stored.
+  assert.equal((await api(app.base,'/api/groups',{group:{side:'source',name:'Bad',levels:[mv1[0].id]}})).status,400);
+  const created=await api(app.base,'/api/groups',{group:{side:'destination',name:'Quad wall',levels:[mv1[0].id,mv2[0].id,mv1[1].id,mv2[1].id]}});
+  assert.equal(created.status,200);const id=created.body.group.id;assert.match(id,/^man:/);
+  assert.deepEqual(created.body.group.levels.map(l=>l.key),['video-1','video-2','audio-1','audio-2']);
+  const wall=created.body.groups.find(g=>g.id===id);
+  assert.equal(wall.type,'Manual group');assert.deepEqual(wall.levels.map(l=>l.id),[mv1[0].id,mv2[0].id,mv1[1].id,mv2[1].id]);
+  assert(!created.body.groups.some(g=>g.id==='dst:nmosgrp_mv1'||g.id==='dst:nmosgrp_mv2'),'fully claimed automatic groups disappear');
+  assert(created.body.routes.some(r=>r.to===mv1[0].id),'existing routes to claimed flows are kept');
+  // Routing through the manual group: two gateway outputs feed video-1/2; breakaway on video-2.
+  const gw=created.body.groups.find(g=>g.id==='src:nmos_gw1');
+  const routed=await api(app.base,'/api/route',{sourceId:gw.id,destinationId:id});assert.equal(routed.status,200);
+  assert.equal(routed.body.routes.find(r=>r.to===mv1[0].id).from,gw.levels[0].id);assert.equal(routed.body.routes.find(r=>r.to===mv2[0].id).from,gw.levels[1].id);
+  assert.deepEqual(routed.body.disconnectedRoutes,[],'audio levels without a source key stay as they were');
+  // A second group may not claim the same flow; editing keeps its own flows.
+  assert.match((await api(app.base,'/api/groups',{group:{side:'destination',name:'Other',levels:[mv1[0].id]}})).body.error,/already belongs/);
+  const edited=await api(app.base,'/api/groups',{group:{id,side:'destination',name:'Quad wall A',levels:[mv2[0].id,mv1[0].id]}});assert.equal(edited.status,200);
+  const changed=edited.body.groups.find(g=>g.id===id);assert.equal(changed.name,'Quad wall A');assert.deepEqual(changed.levels.map(l=>l.id),[mv2[0].id,mv1[0].id]);
+  assert.deepEqual(edited.body.groups.find(g=>g.id==='dst:nmosgrp_mv1').levels.map(l=>l.key),['audio-1'],'released audio returns to its automatic group');
+  // Persistence across restart.
+  await app.stop();app=await start({DATA_DIR:dataDir,ROUTING_MODE:'demo',UI_PASSWORD:''});
+  const restored=(await api(app.base)).body;assert.equal(restored.groups.find(g=>g.id===id)?.name,'Quad wall A');assert(restored.metadata.activity.some(a=>a.type==='group'));
+  const deleted=await api(app.base,'/api/groups/delete',{id});assert.equal(deleted.status,200);
+  assert(!deleted.body.groups.some(g=>g.id===id));assert.deepEqual(deleted.body.groups.find(g=>g.id==='dst:nmosgrp_mv1').levels.map(l=>l.key),['video-1','audio-1']);
+  assert.equal((await api(app.base,'/api/groups/delete',{id})).status,400);
+});
+
 test('embed permits only the configured panel origins and keeps the full application unframeable',async t=>{
   const dataDir=await tempDir('embed-');
   const app=await start({DATA_DIR:dataDir,ROUTING_MODE:'demo',UI_PASSWORD:'',EMBED_ALLOWED_ORIGINS:'http://10.101.13.150'});
