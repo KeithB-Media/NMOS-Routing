@@ -22,9 +22,10 @@ export function validPanel(panel) {
   for(const f of panel.folders){const seen=new Set([f.id]);let parent=f.parentId;while(parent!=null){if(seen.has(parent)||!folders.has(parent))return false;seen.add(parent);parent=folders.get(parent).parentId;}}
   return true;
 }
-// VIP topology endpoint IDs encode device/module/port. Never infer devices from labels.
+// Levels carry the engine device id they belong to (legacy VIP topology ids
+// "topo:<device>.<module>.<port>" are still understood). Never infer devices from labels.
 export function deviceIds(group) {
-  return [...new Set(group.levels.flatMap(l=>{const match=/^topo:([^.]+)\./.exec(l.id);return match?[match[1]]:[];}))];
+  return [...new Set(group.levels.flatMap(l=>{if(l.deviceId)return [l.deviceId];const match=/^topo:([^.]+)\./.exec(l.id);return match?[match[1]]:[];}))];
 }
 export function deviceCatalog(groups,reported=[]) {
   const catalog=new Map(reported.map(d=>[d.id,{id:d.id,name:d.name||d.id,groupIds:[]}]));

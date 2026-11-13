@@ -11,7 +11,7 @@ export function createPanels(root,{getData,onTake,notify}) {
   let routeMap=new Map(),owner=new Map();
   function data(){return getData();}
   function load(){
-    const key='vip-panels-v1:'+ (data().state?.controllerUrl||'demo');if(storageKey===key)return;
+    const key='nmos-panels-v1:'+ (data().state?.controllerUrl||'demo');if(storageKey===key)return;
     storageKey=key;lastTake=null;message='';
     try{const saved=JSON.parse(localStorage.getItem(key));if(Array.isArray(saved?.panels)&&saved.panels.length&&saved.panels.length<=30&&saved.panels.every(validPanel)){panels=saved.panels;panel=panels.find(p=>p.id===saved.activeId)||panels[0];}else throw Error();}
     catch{panel=starterPanel();panels=[panel];}
@@ -24,7 +24,7 @@ export function createPanels(root,{getData,onTake,notify}) {
     return `<div class="panels-toolbar"><div><span class="eyebrow">OPERATOR WORKSPACE</span><h1>Panels</h1></div><label class="panel-picker">Panel <select data-panel-choice aria-label="Choose panel">${panels.map(p=>option(p.id,p.name,panel.id)).join('')}</select></label><button data-panel-action="new">New panel</button><button data-panel-action="edit" class="${edit?'latched':''}" aria-pressed="${edit}">${edit?'Done editing':'Edit layout'}</button>${edit?'<button data-panel-action="add">+ Add widget</button><button data-panel-action="rename">Rename panel</button><button data-panel-action="delete-panel">Delete panel</button>':''}</div><div class="panels-help">${edit?'Drag a widget header or resize its corner. Configure widgets to link them to a context area. Changes save in this browser.':'Choose a destination, choose a source, then Take. Tags, devices and folders update their linked areas.'}</div>`;
   }
   function routebar(){
-    const p=plan(),s=endpoint(sourceId),d=endpoint(destinationId),pending=lastTake?.status==='pending',result=lastTake?(lastTake.status==='success'?'Route confirmed: ':lastTake.status==='error'?'Route failed: ':'Waiting for VIP synchronization: ')+(lastTake.message||lastTake.description):'',status=busy?'Applying route…':p.reason||result||p.warning||'Ready to take';
+    const p=plan(),s=endpoint(sourceId),d=endpoint(destinationId),pending=lastTake?.status==='pending',result=lastTake?(lastTake.status==='success'?'Route confirmed: ':lastTake.status==='error'?'Route failed: ':'Waiting for the engine to confirm: ')+(lastTake.message||lastTake.description):'',status=busy?'Applying route…':p.reason||result||p.warning||'Ready to take';
     return `<div class="panels-routebar"><div><small>DESTINATION</small><strong>${esc(d?.name||'Choose a destination')}</strong></div><span class="panel-route-arrow">←</span><div><small>SOURCE · PRESELECTED</small><strong>${esc(s?.name||'Choose a source')}</strong></div><div class="panels-route-status" role="status">${esc(p.reason||message||status)}</div><button data-panel-action="clear" ${busy?'disabled':''}>Clear</button><button class="panels-take" data-panel-action="take" ${edit||busy||pending||p.reason?'disabled':''} title="${esc(edit?'Finish editing to route':status)}">${busy?'Taking…':'Take'}</button></div>`;
   }
   function render(){
@@ -88,7 +88,7 @@ export function createPanels(root,{getData,onTake,notify}) {
     if(side==='destination'){
       const info=destinationRouteSummary(g,routeMap,owner);summary=(info.mixed?'◐ Breakaway · ':'')+info.current;
     }else summary=g.levels.length+' levels';
-    return `<button class="panel-endpoint ${side} ${chosen?'selected':''}" data-endpoint-widget="${esc(w.id)}" data-group-id="${esc(g.id)}" data-side="${side}" aria-pressed="${chosen}" title="${esc(g.name+'\n'+summary+(locked?'\nLocked in VIP':''))}"><strong>${esc(g.name)}</strong><small>${locked?'🔒 ':''}${esc(summary)}</small></button>`;
+    return `<button class="panel-endpoint ${side} ${chosen?'selected':''}" data-endpoint-widget="${esc(w.id)}" data-group-id="${esc(g.id)}" data-side="${side}" aria-pressed="${chosen}" title="${esc(g.name+'\n'+summary+(locked?'\nLocked':''))}"><strong>${esc(g.name)}</strong><small>${locked?'🔒 ':''}${esc(summary)}</small></button>`;
   }
   function drawLinks(){
     const svg=root.querySelector('.panel-links'),canvas=root.querySelector('.panel-canvas');if(!svg||!canvas)return;

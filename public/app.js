@@ -1,14 +1,14 @@
 import {matrixColumns,matrixCrosspoint} from './matrix.js';
 import {createNmosViewer} from './nmos-viewer.js';
-import {nameSeries} from './name-series.js?v=1.15.0';
-import {compileSearch} from './search.js?v=1.15.0';
-import {RouteFeedback} from './route-feedback.js?v=1.15.0';
-import {supportsSide,groupSearchFields,routeCompatibility,destinationRouteSummary} from './route-options.js?v=1.15.0';
-import {LiveUpdates} from './live-updates.js?v=1.15.0';
-import {workspaceColumns,columnLayout,aliasText,namedGroup,networkValues} from './workspace.js?v=1.15.0';
-import {attachColumnSorter} from './column-sorter.js?v=1.15.0';
-import {attachColumnResize} from './column-resize.js?v=1.15.0';
-import {createPanels} from './panels.js?v=1.15.0';
+import {nameSeries} from './name-series.js?v=0.1.0';
+import {compileSearch} from './search.js?v=0.1.0';
+import {RouteFeedback} from './route-feedback.js?v=0.1.0';
+import {supportsSide,groupSearchFields,routeCompatibility,destinationRouteSummary} from './route-options.js?v=0.1.0';
+import {LiveUpdates} from './live-updates.js?v=0.1.0';
+import {workspaceColumns,columnLayout,aliasText,namedGroup,networkValues} from './workspace.js?v=0.1.0';
+import {attachColumnSorter} from './column-sorter.js?v=0.1.0';
+import {attachColumnResize} from './column-resize.js?v=0.1.0';
+import {createPanels} from './panels.js?v=0.1.0';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -55,17 +55,17 @@ let groupInfo = new Map(), pickerSearchFields = new Map(), records = [], side = 
 let expanded = new Set(), favorites = new Set(), etag = '', polling = false, pop = null, toastTimer, filtered=[];
 const rowMarkup = new WeakMap();let previousRowsMarkup='';
 const feedback = new RouteFeedback();let feedbackTimer;
-let missingLevelPolicy = localStorage.getItem('vip-missing-level-policy') === 'keep' ? 'keep' : 'disconnect';
+let missingLevelPolicy = localStorage.getItem('nmos-missing-level-policy') === 'keep' ? 'keep' : 'disconnect';
 const disconnectChoice = {action:'disconnect'};
-let compact = localStorage.getItem('vip-density-v2') === 'compact';document.body.classList.toggle('compact',compact);
+let compact = localStorage.getItem('nmos-density-v2') === 'compact';document.body.classList.toggle('compact',compact);
 let browserLive=false;
-let nameSet=localStorage.getItem('vip-name-set')||'';
-let savedLayout;try{savedLayout=JSON.parse(localStorage.getItem('vip-columns')||'{}')||{};}catch{savedLayout={};}
+let nameSet=localStorage.getItem('nmos-name-set')||'';
+let savedLayout;try{savedLayout=JSON.parse(localStorage.getItem('nmos-columns')||'{}')||{};}catch{savedLayout={};}
 let columns=workspaceColumns([],savedLayout.spacers||[]),layout=columnLayout(savedLayout,columns),headerSchema='';
 let disposeColumnSorter=null;
 let nameEdit=null;
-let routingLayout=localStorage.getItem('vip-routing-layout')==='matrix'?'matrix':'table';
-let matrixMode=localStorage.getItem('vip-matrix-mode')==='endpoints'?'endpoints':'groups',matrixPage=0,matrixQuery='',matrixVisible=[];
+let routingLayout=localStorage.getItem('nmos-routing-layout')==='matrix'?'matrix':'table';
+let matrixMode=localStorage.getItem('nmos-matrix-mode')==='endpoints'?'endpoints':'groups',matrixPage=0,matrixQuery='',matrixVisible=[];
 let selectedNameCell=null;
 let nameSelection=null,fillingNames=false;
 let updatingNameCell=false;
@@ -97,7 +97,7 @@ function applyColumns() {
   }
   for(const handle of $$('[data-resize-column]')){const c=columns.find(c=>c.id===handle.dataset.resizeColumn);handle.setAttribute('aria-valuenow',layout.widths[c.id]);handle.setAttribute('aria-valuemin',c.min);handle.setAttribute('aria-valuemax','700');handle.setAttribute('aria-valuetext',layout.widths[c.id]+' pixels');}
 }
-attachColumnResize($('.column-row'),{definition:id=>columns.find(c=>c.id===id),width:id=>layout.widths[id],onWidth:(id,value,commit)=>{layout.widths[id]=value;applyColumns();if(commit){savedLayout=null;localStorage.setItem('vip-columns',JSON.stringify(layout));}}});
+attachColumnResize($('.column-row'),{definition:id=>columns.find(c=>c.id===id),width:id=>layout.widths[id],onWidth:(id,value,commit)=>{layout.widths[id]=value;applyColumns();if(commit){savedLayout=null;localStorage.setItem('nmos-columns',JSON.stringify(layout));}}});
 function refreshNames() {
   closePopover();endNameEdit(false,false);selectNameCell(null);rebuildIndexes();page=0;renderRows();updateSuggestions();
   panelsView.update();
@@ -108,9 +108,9 @@ function renderNameSets() {
   const markup='<option value="">Default name</option>'+sets.map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
   if(control.innerHTML!==markup)control.innerHTML=markup;
   control.value=sets.some(s=>s.id===nameSet)?nameSet:'';
-  control.title=sets.length?'Choose an existing videoIPath alias set':'No alias sets are configured in videoIPath';
+  control.title=sets.length?'Choose an alias set':'The engine keeps one operator alias per device';
 }
-$('#name-set').onchange=e=>{nameSet=e.target.value;localStorage.setItem('vip-name-set',nameSet);refreshNames();};
+$('#name-set').onchange=e=>{nameSet=e.target.value;localStorage.setItem('nmos-name-set',nameSet);refreshNames();};
 applyColumns();
 
 function getTags(g) { return state.metadata.tags[g.id] ?? g.tags; }
@@ -151,9 +151,9 @@ function accept(data) {
   if(pop?.g && !byId.has(pop.g.id)) closePopover();
   const sources=groups.filter(g=>supportsSide(g,'source')).length,destinations=groups.filter(g=>supportsSide(g,'destination')).length;
   $('#destination-tab-count').textContent=number(destinations);$('#source-tab-count').textContent=number(sources);
-  $('.workspace-label').innerHTML=`<i class="small-dot"></i>${data.mode==='live'?'VIP workspace':'Demo workspace'}`;
-  $('#footer-mode').textContent=data.mode==='live'?'LIVE VIP':'DEMO MODE';
-  $('#footer-message').textContent=data.mode==='live'?(data.canWrite?'Routing enabled · local tags':'Read-only · local tags'):'No live routes are changed';
+  $('.workspace-label').innerHTML=`<i class="small-dot"></i>${data.mode==='live'?(data.engine?.registry?'Registry '+data.engine.registry.ip:'Live NMOS'):'Demo facility'}`;
+  $('#footer-mode').textContent=data.mode==='live'?'LIVE NMOS':'DEMO MODE';
+  $('#footer-message').textContent=data.mode==='live'?(data.canWrite?'IS-05 routing enabled · local tags':'Read-only · local tags'):'No devices are changed';
   reconcileFeedback();
   renderStatus();renderRows();renderActivity();updateSuggestions();
   panelsView.update();
@@ -161,14 +161,12 @@ function accept(data) {
 function renderStatus() {
   if(!state) return;
   panelsView.status();
-  $('#remove-deployment').hidden=!state.removal;
-  $('#desktop-connection').hidden=!state.desktop;
-  if(state.controllerUrl)$('.workspace-label').title=state.controllerUrl;
+  $('.workspace-label').title=state.controllerUrl||'';
   const stale = !!state.error || !state.lastSync || Date.now()-Date.parse(state.lastSync)>state.syncSeconds*3000;
   const pill=$('#connection-pill');pill.classList.toggle('stale',stale);
   pill.querySelector('.small-dot').style.background=stale?'var(--amber)':'var(--green)';
-  pill.querySelector('span').textContent=stale?'Cache is stale':state.mode==='demo'?'Demo mode':'VIP connected';
-  $('#sync-label').textContent=browserLive?(state.stream?.controller==='live'?'Live · WebSocket':`VIP polling · ${state.syncSeconds}s`):'HTTP fallback';
+  pill.querySelector('span').textContent=stale?'Cache is stale':state.mode==='demo'?'Demo mode':state.engine?.connected?'Registry connected':'Registry disconnected';
+  $('#sync-label').textContent=browserLive?(state.stream?.controller==='live'?'Live · WebSocket':`Engine · ${state.syncSeconds}s`):'HTTP fallback';
   const banner=$('#status-banner');banner.hidden=!stale;
   if(stale) banner.textContent=`${state.error || 'Synchronization is delayed.'} · Showing the last good cache${state.lastSync?' from '+new Date(state.lastSync).toLocaleTimeString():''}. Live routing is unavailable until synchronization recovers.`;
 }
@@ -185,7 +183,7 @@ function routeCell(g, level) {
   const value=level?(names.length>1?`${names.length} destinations`:names[0]||'Unrouted'):info.current;
   const empty=!names.length,mixed=!level&&info.mixed;
   const locked=level?levelRoutes(g,level).some(r=>r.locked):false;
-  return `<button class="route-button${empty?' empty':''}${mixed?' mixed':''}" data-action="route" data-unavailable="${!state.canWrite||locked}" data-id="${esc(g.id)}" ${level?`data-level="${esc(level.key)}"`:''} aria-label="Route ${esc(g.name)}${level?' '+esc(level.name):''}" title="${locked?'Locked in VIP':!state.canWrite?'Live routing is read-only':names.length?esc(level?names.join(', '):(mixed?'Breakaway · levels differ\n':'')+info.detail):'Click to assign a '+(g.side==='destination'?'source':'destination')}" ${!state.canWrite||locked?'disabled':''}><span class="route-value">${empty?'＋ Assign '+(g.side==='destination'?'source':'destination'):esc(value)}</span>${mixed?'<span class="breakaway-badge">⚠ Breakaway</span>':''}<span class="route-feedback-label" hidden></span>${icon(locked?'lock':'down')}</button>`;
+  return `<button class="route-button${empty?' empty':''}${mixed?' mixed':''}" data-action="route" data-unavailable="${!state.canWrite||locked}" data-id="${esc(g.id)}" ${level?`data-level="${esc(level.key)}"`:''} aria-label="Route ${esc(g.name)}${level?' '+esc(level.name):''}" title="${locked?'Locked':!state.canWrite?'Live routing is read-only':names.length?esc(level?names.join(', '):(mixed?'Breakaway · levels differ\n':'')+info.detail):'Click to assign a '+(g.side==='destination'?'source':'destination')}" ${!state.canWrite||locked?'disabled':''}><span class="route-value">${empty?'＋ Assign '+(g.side==='destination'?'source':'destination'):esc(value)}</span>${mixed?'<span class="breakaway-badge">⚠ Breakaway</span>':''}<span class="route-feedback-label" hidden></span>${icon(locked?'lock':'down')}</button>`;
 }
 function groupRow(r) {
   const {g,info}=r,open=expanded.has(g.id);
@@ -196,7 +194,7 @@ function groupRow(r) {
       expand:level?'':`<button class="row-expander${open?' open':''}" data-action="expand" data-id="${esc(g.id)}" aria-label="${open?'Collapse':'Expand'} ${label}" aria-expanded="${open}">${icon('chevron')}</button>`,
       favorite:level?'':`<button class="row-star${favorites.has(g.id)?' on':''}" data-action="favorite" data-id="${esc(g.id)}" aria-label="${favorites.has(g.id)?'Unfavorite':'Favorite'} ${label}" aria-pressed="${favorites.has(g.id)}">${icon('star')}</button>`,
       name:`<span class="signal-name" ${!level&&state.canWrite?'tabindex="0" role="button" data-edit-name aria-label="Edit name for '+label+'" title="Click to select, click again to edit · Enter to edit"':''}>${level?`<i class="level-icon ${level.kind}"></i>${esc(level.name)}`:`<i class="small-dot${info.routed?' routed':''}"></i>${label}`}</span>`,
-      system:esc(level?level.key:g.system),alias:esc(alias)||'<span class="muted">—</span>',
+      system:esc(level?(level.flowName||level.key):g.system),alias:esc(alias)||'<span class="muted">—</span>',
       type:level?`<span class="muted">${level.kind==='video'?'Video':level.kind==='audio'?'Audio':'Ancillary'}</span>`:`<span class="type-badge${g.type==='Audio'?' audio':''}">${esc(g.type)}</span>`,
       current:routeCell(g,level),tags:level?'':tagCell(g),
     };
@@ -329,7 +327,7 @@ function changeMatrixView(){
   endNameEdit(false,false);selectNameCell(null);closePopover();previousRowsMarkup='';renderRows();
 }
 $('#routing-layout').onchange=e=>$('.rail-button[data-view="'+(e.target.value==='matrix'?'matrix':'routing')+'"]').click();
-$('#matrix-mode').onchange=e=>{matrixMode=e.target.value;matrixPage=0;localStorage.setItem('vip-matrix-mode',matrixMode);changeMatrixView();};
+$('#matrix-mode').onchange=e=>{matrixMode=e.target.value;matrixPage=0;localStorage.setItem('nmos-matrix-mode',matrixMode);changeMatrixView();};
 $('#matrix-row-search').oninput=e=>{filters.name=e.target.value;$('[data-filter="name"]').value=e.target.value;resetPage();renderRows();};
 $('#matrix-search').oninput=e=>{matrixQuery=e.target.value;matrixPage=0;renderRows();};
 $('#matrix-prev').onclick=()=>{matrixPage--;renderRows();};
@@ -359,7 +357,7 @@ $('.column-row').onclick=e=>{if(e.target.closest('[data-resize-column]'))return;
 $('#page-size').onchange=e=>{pageSize=Number(e.target.value);resetPage();renderRows();};
 $('#prev-page').onclick=()=>{page--;closePopover();renderRows();$('.table-scroll').scrollTop=0;};
 $('#next-page').onclick=()=>{page++;closePopover();renderRows();$('.table-scroll').scrollTop=0;};
-$('#density').onclick=()=>{compact=!compact;document.body.classList.toggle('compact',compact);localStorage.setItem('vip-density-v2',compact?'compact':'comfortable');};
+$('#density').onclick=()=>{compact=!compact;document.body.classList.toggle('compact',compact);localStorage.setItem('nmos-density-v2',compact?'compact':'comfortable');};
 $('#expand-all').onclick=()=>{
   const visible=filtered.slice(page*pageSize,(page+1)*pageSize),collapse=visible.every(r=>expanded.has(r.g.id));
   for(const r of visible) collapse?expanded.delete(r.g.id):expanded.add(r.g.id);closePopover();renderRows();
@@ -453,7 +451,7 @@ function endNameEdit(restoreFocus=false,render=true) {
 function editName(g,aliasSet,cell,order) {
   if(fillingNames)return;
   if(nameEdit){if(nameEdit.cell===cell)nameEdit.input.focus();else toast('Finish editing the current name first.');return;}
-  const set=state.aliasSets?.find(s=>s.id===aliasSet);if(aliasSet&&!set){toast('This videoIPath name set no longer exists.',true);return;}
+  const set=state.aliasSets?.find(s=>s.id===aliasSet);if(aliasSet&&!set){toast('This name set no longer exists.',true);return;}
   closePopover();
   selectNameCell(cell);
   const previous=aliasSet?g.aliases?.[aliasSet]||'':g.defaultName||g.name,errorId='name-error-'+localId();
@@ -475,7 +473,7 @@ function editName(g,aliasSet,cell,order) {
       etag='';accept(result);
       if(ownsEditor&&direction)nextNameEditor(edit,direction);
       else if(ownsEditor&&restoreFocus&&cell.isConnected)cell.querySelector('[data-edit-name]')?.focus();
-      toast('Name saved to videoIPath');
+      toast('Name saved');
     }catch(err){
       if(nameEdit===edit&&cell.isConnected){showError(err.message);if(restoreFocus)input.focus();}
       else{if(nameEdit===edit)endNameEdit(false,false);toast(err.message,true);}
@@ -558,7 +556,7 @@ function renderRouteOptions(q) {
   pop.options=[...(showDisconnect?[disconnectChoice]:[]),...choices.slice(0,80).map(c=>c.group)];
   const current=g.levels.filter(l=>!levelKey||l.key===levelKey).flatMap(l=>levelRoutes(g,l));
   const disconnectDisabled=!current.length||current.some(r=>r.locked);
-  const disconnectMarkup=showDisconnect?`<button id="choice-0" class="option disconnect-option" role="option" data-disconnect aria-disabled="${disconnectDisabled}" ${disconnectDisabled?'disabled':''}><span class="disconnect-symbol">⊘</span><span class="option-text">Disconnect<small>${!current.length?'Already disconnected':current.some(r=>r.locked)?'Locked in VIP':levelKey?'Disconnect this level'+(g.side==='source'?' from all destinations':''):g.side==='source'?'Disconnect all destinations · all levels':'Disconnect all routed levels'}</small></span></button>`:'';
+  const disconnectMarkup=showDisconnect?`<button id="choice-0" class="option disconnect-option" role="option" data-disconnect aria-disabled="${disconnectDisabled}" ${disconnectDisabled?'disabled':''}><span class="disconnect-symbol">⊘</span><span class="option-text">Disconnect<small>${!current.length?'Already disconnected':current.some(r=>r.locked)?'Locked':levelKey?'Disconnect this level'+(g.side==='source'?' from all destinations':''):g.side==='source'?'Disconnect all destinations · all levels':'Disconnect all routed levels'}</small></span></button>`:'';
   $('#picker-options').innerHTML=disconnectMarkup+(choices.length?choices.slice(0,80).map(({group:c,plan},index)=>{const i=index+offset;return `<button id="choice-${i}" class="option ${plan.status}${i===pop.active?' keyboard-active':''}" role="option" aria-selected="${i===pop.active}" aria-disabled="${plan.status==='unavailable'}" ${plan.status==='unavailable'?'disabled':''} data-choice="${esc(c.id)}" title="${esc(c.description)} · ${esc(plan.reason)}"><i class="small-dot"></i><span class="option-text">${esc(c.name)}<small>${esc(c.description.split('\n')[0]||c.system)}</small>${plan.status!=='full'?`<span class="option-warning">${esc(plan.reason)}</span>`:''}</span><span class="option-meta">${plan.matches.length}/${plan.required.length} levels</span></button>`;}).join(''):'<div class="option-empty">No matching '+targetSide+'s found.</div>');
   $('#picker-count').textContent=`${number(choices.length)} ${targetSide}${choices.length===1?'':'s'}${choices.length>80?' · first 80 shown':''}`;
   $$('#picker-options [data-choice]').forEach(b=>b.onclick=()=>void chooseRoute(byId.get(b.dataset.choice)));
@@ -595,7 +593,7 @@ async function applyRoute(source,destination,{levelKey}={},plan=routeCompatibili
     feedback.accepted(operation,response.status===202||result.routePending===true);
     etag='';accept(result);updateFeedback();
     if(operation.status==='success'){announceRoute('Route confirmed: '+operation.description);toast('Route confirmed: '+operation.description);}
-    else announceRoute('Waiting for VIP synchronization: '+operation.description);
+    else announceRoute('Waiting for the engine to confirm: '+operation.description);
     return {operation};
   } catch(e){feedback.finish(operation,'error',e.message);updateFeedback();announceRoute('Route error: '+e.message);toast(e.message,true);return {operation};}
 }
@@ -616,7 +614,7 @@ async function applyDisconnect(g,levelKey,selected) {
     feedback.accepted(operation,response.status===202||result.routePending===true);
     etag='';accept(result);updateFeedback();
     if(operation.status==='success'){announceRoute('Confirmed: '+operation.description);toast('Confirmed: '+operation.description);}
-    else announceRoute('Waiting for VIP synchronization: '+operation.description);
+    else announceRoute('Waiting for the engine to confirm: '+operation.description);
   } catch(e){feedback.finish(operation,'error',e.message);updateFeedback();announceRoute('Disconnect error: '+e.message);toast(e.message,true);}
 }
 
@@ -687,10 +685,10 @@ window.addEventListener('resize',()=>closePopover());
 
 function renderActivity() {
   if(!state)return;
-  $('#activity-list').innerHTML=state.metadata.activity.length?state.metadata.activity.map(a=>`<div class="activity-item">${icon(a.type==='route'?'route':'tag')}<div><strong>${esc(a.text)}</strong><small>${a.type==='route'?'Route change':'Tag update'} · ${state.mode==='demo'?'demo workspace':'VIP workspace'}</small></div><time>${esc(new Date(a.time).toLocaleString())}</time></div>`).join(''):'<div class="empty-state"><strong>No activity yet</strong><span>Your route changes and tag edits will appear here.</span></div>';
+  $('#activity-list').innerHTML=state.metadata.activity.length?state.metadata.activity.map(a=>`<div class="activity-item">${icon(a.type==='route'?'route':'tag')}<div><strong>${esc(a.text)}</strong><small>${a.type==='route'?'Route change':'Tag update'} · ${state.mode==='demo'?'demo facility':'live NMOS facility'}</small></div><time>${esc(new Date(a.time).toLocaleString())}</time></div>`).join(''):'<div class="empty-state"><strong>No activity yet</strong><span>Your route changes and tag edits will appear here.</span></div>';
 }
 const nmosView=createNmosViewer($('#nmos-view'),{
-  onGroupCreated:result=>{accept(result.inventory);toast('videoIPath group confirmed');},
+  onGroupCreated:result=>{accept(result.inventory);toast('Group confirmed');},
   onOpenGroup:result=>{const group=byId.get(result.groupId);if(!group)return;$('[data-view="routing"]').click();$('#tab-'+group.side).click();$('#clear-filters').click();query=group.name;$('#global-search').value=query;resetPage();renderRows();},
 });
 const panelsView=createPanels($('#panels-view'),{
@@ -704,7 +702,7 @@ $$('button[data-view]').forEach(b=>b.onclick=()=>{
   $('#panels-view').hidden=b.dataset.view!=='panels';panelsView.setVisible(b.dataset.view==='panels');
   if(b.dataset.view==='panels')history.replaceState(null,'',location.pathname+location.search+'#panels');
   else if(location.hash==='#panels')history.replaceState(null,'',location.pathname+location.search);
-  if(routing){routingLayout=b.dataset.view==='matrix'?'matrix':'table';localStorage.setItem('vip-routing-layout',routingLayout);changeMatrixView();}
+  if(routing){routingLayout=b.dataset.view==='matrix'?'matrix':'table';localStorage.setItem('nmos-routing-layout',routingLayout);changeMatrixView();}
   nmosView.setVisible(b.dataset.view==='nmos');
   $$('button[data-view]').forEach(el=>el.classList.toggle('active',el===b));closePopover();
 });
@@ -718,7 +716,7 @@ function showColumns() {
   const r=anchor.getBoundingClientRect();$('#popover').style.left=Math.max(12,Math.min(r.right-$('#popover').offsetWidth,window.innerWidth-$('#popover').offsetWidth-12))+'px';
   $('#reset-columns').focus();
 }
-function saveColumns() {savedLayout=null;layout=columnLayout(layout,columns);localStorage.setItem('vip-columns',JSON.stringify(layout));applyColumns();rebuildRecords();renderRows();updateSuggestions();}
+function saveColumns() {savedLayout=null;layout=columnLayout(layout,columns);localStorage.setItem('nmos-columns',JSON.stringify(layout));applyColumns();rebuildRecords();renderRows();updateSuggestions();}
 function renderColumnMenu() {
   disposeColumnSorter?.();
   const menu=$('#popover');menu.classList.add('column-menu');menu.setAttribute('role','dialog');menu.setAttribute('aria-label','Choose and reorder columns');
@@ -740,26 +738,13 @@ $('#columns').onclick=()=>{if(pop?.kind==='columns')closePopover(true);else show
 function help(){showDialog(`<div class="eyebrow">A FASTER WAY TO ROUTE</div><h2>Find it. Route it.</h2><p>Search any column as you type. Filters work together, and every search runs against the local cache.</p><dl><dt>Contains, by default</dt><dd><code>REPLAY</code> finds any field containing REPLAY</dd><dt>Either term</dt><dd><code>PCR1 | PCR2</code></dd><dt>Exact field match</dt><dd><code>"REPLAY 56"</code></dd><dt>Both terms</dt><dd><code>REPLAY 56</code></dd><dt>Wildcards</dt><dd><code>PCR?*PGM</code> · <code>*</code> any characters, <code>?</code> one</dd><dt>Display name search</dt><dd>Press <code>F</code> outside a text field, or <code>Ctrl+Shift+F</code> from another input</dd><dt>Global search</dt><dd>Press <code>/</code> outside a text field</dd></dl><p>Click a current route to assign a compatible source. Expand the group for individual video, audio, and ANC levels. The Sources tab lets you assign destinations in the same way.</p><p class="dialog-note">Group routing matches schema content IDs. Missing levels disconnect by default; change this to Keep existing in Settings. Individual routing creates a breakaway. Tags are shared Route Desk metadata, stored locally on the server.</p>`);}
 $('#help').onclick=help;$('#search-help').onclick=help;$('#close-dialog').onclick=()=>$('#info-dialog').close();
 $('#info-dialog').addEventListener('click',e=>{if(e.target===$('#info-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
-$('#desktop-connection').onclick=()=>{location.href='/connection';};
 $('#settings').onclick=()=>{
   const theme=document.documentElement.dataset.theme||'current';
-  const appearance=`<label class="setting-label" for="appearance-theme">Appearance</label><select id="appearance-theme" data-theme-picker><option value="current" ${theme==='current'?'selected':''}>Medium</option><option value="sapphire" ${theme==='sapphire'?'selected':''}>Light</option><option value="videoipath" ${theme==='videoipath'?'selected':''}>Dark</option></select><p class="setting-help">Saved in this browser across refreshes and reloads.</p>`;
-  showDialog(`<div class="eyebrow">SETTINGS</div><h2>Your routing workspace</h2>${appearance}<label class="setting-label" for="missing-level-policy">Missing levels when routing a group</label><select id="missing-level-policy"><option value="disconnect" ${missingLevelPolicy==='disconnect'?'selected':''}>Disconnect missing levels (default)</option><option value="keep" ${missingLevelPolicy==='keep'?'selected':''}>Keep existing routes</option></select><p class="setting-help">Applies when a source lacks a destination content ID. Saved in this browser across refreshes and reloads.</p><dl><dt>Service address</dt><dd><code>${esc(location.origin)}</code></dd><dt>Panel URL</dt><dd><code>${esc(location.origin)}/embed</code></dd><dt>Browser updates</dt><dd>${browserLive?'WebSocket':'HTTP fallback · every 1s'}</dd><dt>VIP updates</dt><dd>${state?.stream?.controller==='live'?'WebSocket notifications':'Polling every '+(state?.syncSeconds||5)+'s'}</dd><dt>Safety refresh</dt><dd>Every ${state?.stream?.reconciliationSeconds||state?.syncSeconds||5}s</dd><dt>Last synchronization</dt><dd>${state?.lastSync?esc(new Date(state.lastSync).toLocaleString()):'Not yet synchronized'}</dd><dt>Routing</dt><dd>${state?.canWrite?'Enabled':'Read-only'}</dd><dt>Search</dt><dd>Local browser cache · no API calls while typing</dd><dt>Tags</dt><dd>${state?.ephemeralState?'Memory only · resets on restart':'Persistent shared Route Desk metadata'}</dd></dl><p class="dialog-note">${state?.desktop?'Use Connection or File → Connection to change the controller or API account.':'VIP credentials and synchronization settings are configured on the server.'} Changes to sources, destinations, and routes are picked up automatically.</p>`);
-  $('#missing-level-policy').onchange=e=>{missingLevelPolicy=e.target.value;localStorage.setItem('vip-missing-level-policy',missingLevelPolicy);toast('Missing levels: '+(missingLevelPolicy==='keep'?'keep existing routes':'disconnect'));};
+  const appearance=`<label class="setting-label" for="appearance-theme">Appearance</label><select id="appearance-theme" data-theme-picker><option value="current" ${theme==='current'?'selected':''}>Medium</option><option value="sapphire" ${theme==='sapphire'?'selected':''}>Light</option><option value="graphite" ${theme==='graphite'?'selected':''}>Dark</option></select><p class="setting-help">Saved in this browser across refreshes and reloads.</p>`;
+  showDialog(`<div class="eyebrow">SETTINGS</div><h2>Your routing workspace</h2>${appearance}<label class="setting-label" for="missing-level-policy">Missing levels when routing a group</label><select id="missing-level-policy"><option value="disconnect" ${missingLevelPolicy==='disconnect'?'selected':''}>Disconnect missing levels (default)</option><option value="keep" ${missingLevelPolicy==='keep'?'selected':''}>Keep existing routes</option></select><p class="setting-help">Applies when a source lacks a destination content ID. Saved in this browser across refreshes and reloads.</p><dl><dt>Service address</dt><dd><code>${esc(location.origin)}</code></dd><dt>Panel URL</dt><dd><code>${esc(location.origin)}/embed</code></dd><dt>Browser updates</dt><dd>${browserLive?'WebSocket':'HTTP fallback · every 1s'}</dd><dt>Engine updates</dt><dd>${state?.stream?.controller==='live'?'Registry WebSocket push':'Polling every '+(state?.syncSeconds||5)+'s'}</dd><dt>Safety refresh</dt><dd>Every ${state?.stream?.reconciliationSeconds||state?.syncSeconds||5}s</dd><dt>Last synchronization</dt><dd>${state?.lastSync?esc(new Date(state.lastSync).toLocaleString()):'Not yet synchronized'}</dd><dt>Routing</dt><dd>${state?.canWrite?'Enabled':'Read-only'}</dd><dt>Search</dt><dd>Local browser cache · no API calls while typing</dd><dt>Tags</dt><dd>${state?.ephemeralState?'Memory only · resets on restart':'Persistent shared metadata'}</dd></dl><p class="dialog-note">Registry discovery and engine settings are configured on the server. Changes to sources, destinations, and routes are picked up automatically.</p>`);
+  $('#missing-level-policy').onchange=e=>{missingLevelPolicy=e.target.value;localStorage.setItem('nmos-missing-level-policy',missingLevelPolicy);toast('Missing levels: '+(missingLevelPolicy==='keep'?'keep existing routes':'disconnect'));};
 };
 $('#refresh').onclick=async()=>{if(polling)return;polling=true;$('#refresh').classList.add('spin');await mutate('/api/sync',{});$('#refresh').classList.remove('spin');polling=false;if(!state?.error)toast('Inventory synchronized');};
-$('#remove-deployment').onclick=async()=>{
-  const button=$('#remove-deployment');button.disabled=true;button.textContent='Removing…';
-  try{
-    const prepared=await fetch('/api/removal',{signal:AbortSignal.timeout(10000)}),challenge=await prepared.json();
-    if(!prepared.ok)throw new Error(challenge.error||'Removal is unavailable');
-    const response=await fetch('/api/removal',{method:'POST',headers:{'Content-Type':'application/json','X-Route-Desk-Removal':challenge.token},body:'{}',signal:AbortSignal.timeout(15000)}),result=await response.json();
-    if(!response.ok||!result.accepted)throw new Error(result.error||'Removal was not accepted');
-    liveUpdates.stop();polling=true;closePopover();
-    showDialog(`<div class="eyebrow">REMOVAL STARTED</div><h2>Removing Route Desk</h2><p>The container, application image and removal configuration on ${esc(result.host)} are being deleted. This page will stop responding. You can close this tab.</p>`);
-    $('#close-dialog').hidden=true;$('#rows').inert=true;
-  }catch(error){button.disabled=false;button.textContent='Remove Route Desk';toast(error.message+' · No automatic retry was made.',true);}
-};
 async function poll(force=false) {
   if(force)etag='';
   if(polling)return;polling=true;

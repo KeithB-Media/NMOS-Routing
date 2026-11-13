@@ -28,7 +28,7 @@ export function routeCompatibility(source,destination,levelKey,lockedEndpoints=n
   }
   const self=source.id===destination.id||matches.some(d=>source.levels.find(s=>s.key===d.key)?.id===d.id);
   return {required,matches,unchanged,locked,status:self||locked.length?'unavailable':matches.length===required.length&&matches.length?'full':matches.length?'partial':'unavailable',
-    reason:self?'A junction cannot route to itself':locked.length?locked.map(l=>l.name+' is locked in VIP').join(' · '):unchanged.map(({level})=>`${level.name} ${missingLevelPolicy==='keep'?'stays unchanged':'will disconnect'}`).join(' · ')||(!required.length?'No routable levels':'')};
+    reason:self?'A junction cannot route to itself':locked.length?locked.map(l=>l.name+' is locked').join(' · '):unchanged.map(({level})=>`${level.name} ${missingLevelPolicy==='keep'?'stays unchanged':'will disconnect'}`).join(' · ')||(!required.length?'No routable levels':'')};
 }
 export function supportsSide(group,side) {return group.side===side||group.side==='bidirectional'||group.bidirectional===true;}
 

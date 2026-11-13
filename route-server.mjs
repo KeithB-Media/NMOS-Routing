@@ -125,8 +125,9 @@ function waitForState(test, timeout = 2500) {
 }
 const unsubscribe = backend.onState(scheduleRefresh);
 refresh();
-// Registry connection state changes do not go through onState; poll it cheaply.
-const statusTimer = setInterval(() => { if (mode === 'live') scheduleRefresh(); }, 2000); statusTimer.unref();
+// Registry connection state changes do not go through onState, and the UI
+// judges freshness from lastSync, so tick every 2 s in both modes.
+const statusTimer = setInterval(scheduleRefresh, 2000); statusTimer.unref();
 
 const nmosViewer = new NmosViewer(null), registries_ = new Map();
 async function viewerFor(url, nodeUrl) {

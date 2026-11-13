@@ -41,7 +41,7 @@ export class RouteFeedback {
   sweep() {
     const time=this.now();let changed=false;
     for(const [id,operation] of this.operations) if(time>=operation.expiresAt) {
-      if(operation.status==='pending') this.finish(operation,'error','Route was not confirmed within 60 seconds. Check VIP before retrying.');
+      if(operation.status==='pending') this.finish(operation,'error','Route was not confirmed within 60 seconds. Check the engine log before retrying.');
       else this.operations.delete(id);
       changed=true;
     }
