@@ -28,5 +28,9 @@ nmos-crosspoint v3 engine (vendored, MIT).
   virtual senders, DDNS (TSIG secret never echoed), BCP-008 and audio-monitor
   toggles. `/api/setup`, `/api/leases/*`; writes the engine settings.json and
   hot-applies registry, lease, DDNS and BCP-008 changes.
+- BCP-008 health column: per-flow and per-group status dots from the engine's
+  IS-12 monitors, a status dialog with the four domains, live packet counters
+  and a counter reset (`/api/bcp008/counters`, `/api/bcp008/reset`).
+- Activity view tails the engine log (`/api/engine?after=`).
 - Tests: 78 passing, including IS-05 PATCH-body tests against a mock node and
   a live-mode engine boot test.

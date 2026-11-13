@@ -50,9 +50,9 @@ indicator until the registry push arrives.
 
 ## Roadmap
 
-1. **UI rebrand + engine status** — strip videoIPath wording, show registry
-   connection, engine log in Activity, BCP-008 health column, multicast
-   columns from `level.network`.
+1. ~~UI rebrand + engine status~~ — done: registry state in the status pill,
+   engine log in Activity, BCP-008 Health column and status dialog, multicast
+   and MXL address columns from `level.network`.
 2. ~~Manual group builder~~ — done: `lib/manual-groups.mjs`, `/api/groups`,
    Groups dialog. Flows claimed by a manual group leave their automatic group.
 3. ~~Setup page~~ — done: `lib/setup.mjs` (port of upstream setupConfig),

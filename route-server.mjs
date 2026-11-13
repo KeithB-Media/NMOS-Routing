@@ -55,6 +55,11 @@ function demoBackend(state) {
     async enableReceiver(id, enabled) { const hit = find(id, 'receivers'); if (!hit) throw new Error('Unknown receiver.'); hit.flow.active = enabled; notify(); },
     log: {getState: () => ({logList: [], lastLogId: 0})},
     leases: null, settings: null, settingsFile: null, parseSettings: null,
+    // BCP-008 stand-in: counters for flows that carry a monitor in the demo state.
+    bcp008: {
+      async getPacketCounters(uuid) { for (const d of ['senders', 'receivers']) { const hit = find('nmos_' + uuid, d); if (hit?.flow.monitor) return [{label: hit.flow.monitor.status >= 3 ? 'Stream' : 'Link', counters: [{name: 'packets_received', value: 123456}, {name: 'packets_lost', value: hit.flow.monitor.status >= 3 ? 4210 : 0}, {name: 'packets_late', value: 0}]}]; } return null; },
+      async resetCounters(uuid) { for (const d of ['senders', 'receivers']) { const hit = find('nmos_' + uuid, d); if (hit?.flow.monitor) { hit.flow.monitor.counter = 0; for (const dom of hit.flow.monitor.domains || []) dom.counter = 0; notify(); return true; } } return false; },
+    },
     async close() {},
   };
 }
@@ -293,6 +298,22 @@ const server = http.createServer(async (req, res) => {
         if (failures.length) return send(res, 502, {...snapshot(), error: failures.join(' '), routePending: true, disconnectedRoutes: removed.map(({from, to}) => ({from, to}))});
         return send(res, routePending ? 202 : 200, {...snapshot(), routePending, disconnectedRoutes: removed.map(({from, to}) => ({from, to}))});
       } finally { writeBusy = false; }
+    }
+    if (['/api/bcp008/counters', '/api/bcp008/reset'].includes(url.pathname)) {
+      if (typeof data.id !== 'string') throw new Error('Flow id required');
+      const uuid = data.id.startsWith('nmos_') ? data.id.slice(5) : data.id;
+      if (!backend.bcp008) return send(res, 404, {error: 'BCP-008 monitoring is not running.'});
+      if (url.pathname.endsWith('/reset')) {
+        if (!canWrite) return send(res, 403, {error: 'Routing is read-only. Set WRITE_ENABLED=true on the server.'});
+        const ok = await backend.bcp008.resetCounters(uuid);
+        if (!ok) return send(res, 404, {error: 'No BCP-008 monitor is connected for this flow.'});
+        logAction('route', `Reset BCP-008 counters on ${data.id}`);
+        refresh(); revision++; liveHub?.publish();
+        return send(res, 200, {reset: true});
+      }
+      const groups = await backend.bcp008.getPacketCounters(uuid);
+      if (!groups) return send(res, 404, {error: 'No BCP-008 monitor is connected for this flow.'});
+      return send(res, 200, {groups});
     }
     if (url.pathname === '/api/hidden') {
       if (!requireWrite(res)) return;

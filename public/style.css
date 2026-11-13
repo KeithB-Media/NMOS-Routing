@@ -129,3 +129,20 @@ dialog.group-dialog{width:960px;max-width:95vw}
 .nmos-panel .setup-check{flex-direction:row;align-items:flex-start;gap:9px}
 .nmos-panel .setup-check input,.nmos-panel .setup-adopt input{width:auto;padding:0;margin:3px 0 0;flex:none;height:auto}
 .nmos-panel .setup-adopt label{flex-direction:row;align-items:center;gap:6px}
+
+/* BCP-008 health */
+.health-cell{display:flex;align-items:center;gap:6px;font-size:11px;color:#c1c9d2}
+.health-dot{width:11px;height:11px;border-radius:50%;background:#5b6470;border:0;padding:0;flex:none;box-shadow:0 0 0 2px #0003}
+.health-dot.s1{background:#5fd27a}.health-dot.s2{background:#ffb347}.health-dot.s3{background:#ff6b6b}.health-dot.s0{background:#5b6470}
+button.health-button{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:inherit;padding:2px 4px;border-radius:6px;cursor:pointer;font:inherit}
+button.health-button:hover{background:#ffffff12}
+.health-domains{display:grid;grid-template-columns:120px 1fr 90px;gap:6px 12px;font-size:11px;margin:14px 0}
+.health-domains .d{color:#8c95a1}
+.health-counters{font-size:11px;margin:10px 0}
+.health-counters table{border-collapse:collapse;width:100%}
+.health-counters td{padding:3px 6px;border-bottom:1px solid #1f242b}
+.engine-log-header{margin-top:26px}
+.engine-log{display:flex;flex-direction:column;gap:3px;font-family:ui-monospace,monospace;font-size:10.5px;max-height:50vh;overflow:auto}
+.engine-log .log-line{display:grid;grid-template-columns:150px 70px 120px 1fr;gap:10px;padding:3px 6px;border-bottom:1px solid #1a1f26;color:#c1c9d2}
+.engine-log .log-line time{color:#8c95a1}
+.engine-log .log-line .sev-error{color:#ff8a8a}.engine-log .log-line .sev-warning{color:#ffc86b}.engine-log .log-line .sev-success{color:#8fd99a}.engine-log .log-line .sev-info{color:#9ab7e0}.engine-log .log-line .sev-verbose,.engine-log .log-line .sev-debug{color:#7f8893}

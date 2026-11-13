@@ -7,6 +7,7 @@ export const columns=[
   {id:'type',label:'Type',width:90,min:75},
   {id:'current',label:'Current route',width:260,min:180},
   {id:'tags',label:'Tags',width:160,min:100},
+  {id:'health',label:'Health',width:96,min:70,filter:false},
   {id:'multicast',label:'Multicast address',width:185,min:120},
   {id:'sourceAddress',label:'Source address',width:185,min:120},
   {id:'sdp',label:'SDP',width:56,min:48,filter:false,sort:false},

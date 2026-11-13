@@ -85,6 +85,12 @@ test('demo server: inventory, ETag caching, routing with missing-level policy, b
   assert(!(await api(app.base,'/api/hidden',{id:'nmos_virtual'})).body.groups.some(g=>g.id==='src:nmos_virtual')===false);
   const sdp=await api(app.base,'/api/sdp?'+new URLSearchParams({groupId:'src:nmos_virtual',view:'source'}));assert.equal(sdp.status,200);assert.match(sdp.body.blocks[0].sdp,/m=audio/);
   const engine=await api(app.base,'/api/engine');assert.equal(engine.body.mode,'demo');assert.deepEqual(engine.body.log,[]);
+  // BCP-008: the demo state carries one degraded receiver (MON 3 audio 4) and one healthy video.
+  const mon3=initial.body.groups.find(g=>g.id==='dst:nmosgrp_mon3');assert.deepEqual(mon3.monitor,{worst:3,count:1});assert.equal(mon3.levels[4].monitor.status,3);assert.equal(mon3.levels[4].monitor.domains.length,4);
+  const counters=await api(app.base,'/api/bcp008/counters',{id:mon3.levels[4].id});assert.equal(counters.status,200);assert.equal(counters.body.groups[0].counters.find(c=>c.name==='packets_lost').value,4210);
+  assert.equal((await api(app.base,'/api/bcp008/counters',{id:mon3.levels[0].id})).status,404,'flows without a monitor have no counters');
+  assert.equal((await api(app.base,'/api/bcp008/reset',{id:mon3.levels[4].id})).status,200);
+  assert.equal((await api(app.base)).body.groups.find(g=>g.id==='dst:nmosgrp_mon3').levels[4].monitor.counter,0,'reset clears transition counters');
   const cross=await fetch(app.base+'/api/route',{method:'POST',headers:{Origin:'https://evil.example','Content-Type':'application/json'},body:'{}'});assert.equal(cross.status,403);
   // Metadata survives a restart; demo inventory does not (it is regenerated).
   await app.stop();app=await start({DATA_DIR:dataDir,ROUTING_MODE:'demo',UI_PASSWORD:''});

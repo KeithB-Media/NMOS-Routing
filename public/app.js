@@ -203,6 +203,7 @@ function groupRow(r) {
     for(const c of columns){
       if(c.aliasId)content[c.id]=esc((level?level.aliases:g.aliases)?.[c.aliasId])||'<span class="muted">—</span>';
       if(c.spacer)content[c.id]='';
+      if(c.id==='health')content[c.id]=healthCell(g,level);
       if(['multicast','sourceAddress'].includes(c.id)){
         const representative=level||g.levels.find(l=>l.kind==='video')||g.levels[0];
         const values=representative?networkValues(g,representative,c.id):[];
@@ -393,6 +394,7 @@ $('#rows').onclick=async e=>{
   if(button.dataset.action==='route') openRoute(g,button.dataset.level,button);
   if(button.dataset.action==='tags') openTags(g,button);
   if(button.dataset.action==='sdp-menu')openSdpMenu(g,button.dataset.level,button);
+  if(button.dataset.action==='health')openHealth(g,button.dataset.level);
 };
 
 function selectNameCell(cell){
@@ -703,6 +705,7 @@ $$('button[data-view]').forEach(b=>b.onclick=()=>{
   const routing=['routing','matrix'].includes(b.dataset.view);
   $('#routing-view').hidden=!routing;$('#activity-view').hidden=b.dataset.view!=='activity';$('#nmos-view').hidden=b.dataset.view!=='nmos';
   $('#setup-view').hidden=b.dataset.view!=='setup';setupView.setVisible(b.dataset.view==='setup');
+  watchEngineLog(b.dataset.view==='activity');
   $('#panels-view').hidden=b.dataset.view!=='panels';panelsView.setVisible(b.dataset.view==='panels');
   if(b.dataset.view==='panels')history.replaceState(null,'',location.pathname+location.search+'#panels');
   else if(location.hash==='#panels')history.replaceState(null,'',location.pathname+location.search);
@@ -748,6 +751,43 @@ $('#settings').onclick=()=>{
   showDialog(`<div class="eyebrow">SETTINGS</div><h2>Your routing workspace</h2>${appearance}<label class="setting-label" for="missing-level-policy">Missing levels when routing a group</label><select id="missing-level-policy"><option value="disconnect" ${missingLevelPolicy==='disconnect'?'selected':''}>Disconnect missing levels (default)</option><option value="keep" ${missingLevelPolicy==='keep'?'selected':''}>Keep existing routes</option></select><p class="setting-help">Applies when a source lacks a destination content ID. Saved in this browser across refreshes and reloads.</p><dl><dt>Service address</dt><dd><code>${esc(location.origin)}</code></dd><dt>Panel URL</dt><dd><code>${esc(location.origin)}/embed</code></dd><dt>Browser updates</dt><dd>${browserLive?'WebSocket':'HTTP fallback · every 1s'}</dd><dt>Engine updates</dt><dd>${state?.stream?.controller==='live'?'Registry WebSocket push':'Polling every '+(state?.syncSeconds||5)+'s'}</dd><dt>Safety refresh</dt><dd>Every ${state?.stream?.reconciliationSeconds||state?.syncSeconds||5}s</dd><dt>Last synchronization</dt><dd>${state?.lastSync?esc(new Date(state.lastSync).toLocaleString()):'Not yet synchronized'}</dd><dt>Routing</dt><dd>${state?.canWrite?'Enabled':'Read-only'}</dd><dt>Search</dt><dd>Local browser cache · no API calls while typing</dd><dt>Tags</dt><dd>${state?.ephemeralState?'Memory only · resets on restart':'Persistent shared metadata'}</dd></dl><p class="dialog-note">Registry discovery and engine settings are configured on the server. Changes to sources, destinations, and routes are picked up automatically.</p>`);
   $('#missing-level-policy').onchange=e=>{missingLevelPolicy=e.target.value;localStorage.setItem('nmos-missing-level-policy',missingLevelPolicy);toast('Missing levels: '+(missingLevelPolicy==='keep'?'keep existing routes':'disconnect'));};
 };
+// ---- BCP-008 health (IS-12 status monitors) ----
+const HEALTH_LABEL={0:'Inactive',1:'Healthy',2:'Partially healthy',3:'Unhealthy'};
+function healthCell(g,level){
+  const m=level?level.monitor:g.monitor;
+  if(!m)return '<span class="muted">—</span>';
+  const status=level?m.status:m.worst,text=level?HEALTH_LABEL[status]||'Unknown':(m.count?m.count+' affected':HEALTH_LABEL[status]||'Healthy');
+  const title=level?(m.message||HEALTH_LABEL[status]||'')+(m.detail?'\n'+m.detail:''):'Worst flow status: '+(HEALTH_LABEL[status]||status);
+  return '<button class="health-button" data-action="health" data-id="'+esc(g.id)+'"'+(level?' data-level="'+esc(level.key)+'"':'')+' title="'+esc(title)+'" aria-label="BCP-008 status for '+esc(g.name)+(level?' '+esc(level.name):'')+'"><span class="health-dot s'+esc(status)+'"></span><span>'+esc(text)+'</span></button>';
+}
+async function openHealth(g,levelKey){
+  const level=levelKey?g.levels.find(l=>l.key===levelKey):null;
+  const targets=level?[level]:g.levels.filter(l=>l.monitor);
+  if(!targets.length){toast('No BCP-008 monitor reported for this group',true);return;}
+  const block=l=>{const m=l.monitor||{};return '<section class="setup-section"><h3>'+esc(l.name)+' · '+esc(l.flowName||'')+'</h3><p><span class="health-dot s'+esc(m.status)+'"></span> '+esc(HEALTH_LABEL[m.status]||'Unknown')+(m.message?' · '+esc(m.message):'')+(m.counter?' · '+esc(m.counter)+' transitions since reset':'')+'</p>'
+    +(m.domains?.length?'<div class="health-domains">'+m.domains.map(d=>'<span class="d">'+esc(d.label)+'</span><span><span class="health-dot s'+esc(d.status)+'"></span> '+esc(HEALTH_LABEL[d.status]||'')+(d.message?' · '+esc(d.message):'')+'</span><span class="d">'+esc(d.counter||0)+' transitions</span>').join('')+'</div>':'<p class="muted">The device does not publish per-domain status.</p>')
+    +'<div class="health-counters" data-counters="'+esc(l.id)+'"><span class="muted">Reading packet counters…</span></div>'
+    +(state?.canWrite?'<button type="button" class="quiet-button" data-reset="'+esc(l.id)+'">Reset counters</button>':'')+'</section>';};
+  showDialog('<div class="eyebrow">BCP-008 STATUS</div><h2>'+esc(g.name)+'</h2><p>Live health from the device\'s NcSender/NcReceiverMonitor over IS-12. Counters are read from the device now; status follows registry pushes.</p>'+targets.map(block).join(''));
+  for(const box of $$('#dialog-content [data-counters]')){
+    try{const r=await fetch('/api/bcp008/counters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:box.dataset.counters}),signal:AbortSignal.timeout(10000)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Counters unavailable');
+      box.innerHTML=data.groups.map(gr=>'<table><thead><tr><th colspan="2">'+esc(gr.label)+'</th></tr></thead><tbody>'+gr.counters.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.value)+'</td></tr>').join('')+'</tbody></table>').join('');
+    }catch(e){box.innerHTML='<span class="muted">'+esc(e.message)+'</span>';}
+  }
+  for(const b of $$('#dialog-content [data-reset]'))b.onclick=async()=>{b.disabled=true;try{const r=await fetch('/api/bcp008/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.dataset.reset})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Reset failed');toast('Counters reset');}catch(e){toast(e.message,true);}finally{b.disabled=false;}};
+}
+// ---- Engine log (Activity view) ----
+let engineLogLast=0,engineLogTimer=null,engineLogLines=[];
+async function loadEngineLog(){
+  try{const r=await fetch('/api/engine?after='+engineLogLast,{signal:AbortSignal.timeout(8000)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Engine log unavailable');
+    if(data.log.length){engineLogLines=[...engineLogLines,...data.log].slice(-400);engineLogLast=data.log[data.log.length-1].id;}
+    $('#engine-log-status').textContent=data.mode==='demo'?'Demo mode · the engine is not running':(data.connected?'Registry '+data.registry.ip+':'+data.registry.port+' connected':'No registry connected')+' · '+engineLogLines.length+' recent entries';
+    const box=$('#engine-log'),atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<40;
+    box.innerHTML=engineLogLines.length?engineLogLines.map(l=>'<div class="log-line"><time>'+esc(new Date(l.time).toLocaleTimeString())+'</time><span class="sev-'+esc(l.severity)+'">'+esc(l.severity)+'</span><span>'+esc(l.topic)+'</span><span>'+esc(l.text)+'</span></div>').join(''):'<div class="log-line"><span class="muted">No engine log entries yet.</span></div>';
+    if(atBottom)box.scrollTop=box.scrollHeight;
+  }catch(e){$('#engine-log-status').textContent=e.message;}
+}
+function watchEngineLog(on){clearInterval(engineLogTimer);engineLogTimer=null;if(on){loadEngineLog();engineLogTimer=setInterval(loadEngineLog,4000);}}
 // ---- Manual routing groups ----
 const groupBuilder={groups:[],catalog:[],unresolved:[],draft:null,filter:''};
 function groupDraft(group){return group?{id:group.id,side:group.side,name:group.name,levels:group.levels.map(l=>l.flowId)}:{id:null,side:'destination',name:'',levels:[]};}
