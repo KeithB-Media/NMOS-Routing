@@ -13,7 +13,7 @@
 | `lib/live-hub.mjs` | Browser WebSocket deltas (unchanged from Route Desk). |
 | `lib/nmos-viewer.mjs`, `lib/stream-cache.mjs` | NMOS viewer (registry/node browsing) and SDP parsing/view. |
 | `public/` | Vanilla-JS UI: routing table, matrix, panels, NMOS viewer. |
-| `packages/crosspoint-engine/` | Vendored nmos-crosspoint server, built with `tsc`. `src/lib` is pristine. |
+| `packages/crosspoint-engine/` | Vendored nmos-crosspoint server, built with `tsc`. `src/lib` is upstream plus the marked patches in `UPSTREAM-PATCHES.md`. |
 
 The engine addresses `./config` and `./state` relative to the process cwd, so
 `lib/engine.mjs` moves the process into `ENGINE_DIR` (default
@@ -58,11 +58,12 @@ indicator until the registry push arrives.
    + lease inventory, vendor Web-UI links, virtual senders, DDNS, BCP-008 and
    audio monitor toggles; writes `settings.json` through the engine's
    `setupConfig` semantics.
-4. **BCP-007-03 (MXL)** — recognise `urn:x-nmos:transport:mxl`, IS-05
-   connect with `mxl_domain_id`/`mxl_flow_id` and no `transport_file`,
-   BCP-004-01 capability check. Engine insertion points:
-   `nmosConnector.connectionGetSenderInfo`, `nmosConnector.makeConnection`,
-   `crosspointUpdateThread` capability tagging.
+4. ~~BCP-007-03 (MXL)~~ — done. Engine: `connectionGetSenderInfo` reads
+   `mxl_domain_id`/`mxl_flow_id` from the sender's IS-05 active params,
+   `makeConnection` sends them with no `transport_file` and refuses RTP/MXL
+   mixes (see `packages/crosspoint-engine/UPSTREAM-PATCHES.md`). Adapter
+   exposes `level.network.transport` and `.mxl`; planners refuse mismatches.
+   Still open: BCP-004-01 constraint-set evaluation beyond the transport check.
 5. **Audio monitor + multicast probe** — optional native deps
    (`@discordjs/opus`, `werift`), WebRTC listen-in, probe websocket.
 6. **Virtual NMOS node + DDNS** — mount `NmosNodeApi` routes on the Route

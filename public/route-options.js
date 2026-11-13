@@ -20,15 +20,15 @@ export function destinationRouteSummary(group, routesByDestination, endpointOwne
 
 export function routeCompatibility(source,destination,levelKey,lockedEndpoints=new Set(),missingLevelPolicy='disconnect') {
   const required=destination.levels.filter(l=>!levelKey||l.key===levelKey);
-  const matches=[],unchanged=[],locked=[];
+  const matches=[],unchanged=[],locked=[],transportMismatch=[];
   for(const level of required) {
     const sourceLevel=source.levels.find(s=>s.key===level.key);
     if(!sourceLevel) {unchanged.push({level});if(!levelKey&&missingLevelPolicy==='disconnect'&&lockedEndpoints.has(level.id))locked.push(level);}
-    else {matches.push(level);if(lockedEndpoints.has(level.id))locked.push(level);}
+    else {matches.push(level);if(lockedEndpoints.has(level.id))locked.push(level);if(sourceLevel.network?.transport&&level.network?.transport&&sourceLevel.network.transport!==level.network.transport)transportMismatch.push(level);}
   }
   const self=source.id===destination.id||matches.some(d=>source.levels.find(s=>s.key===d.key)?.id===d.id);
-  return {required,matches,unchanged,locked,status:self||locked.length?'unavailable':matches.length===required.length&&matches.length?'full':matches.length?'partial':'unavailable',
-    reason:self?'A junction cannot route to itself':locked.length?locked.map(l=>l.name+' is locked').join(' · '):unchanged.map(({level})=>`${level.name} ${missingLevelPolicy==='keep'?'stays unchanged':'will disconnect'}`).join(' · ')||(!required.length?'No routable levels':'')};
+  return {required,matches,unchanged,locked,transportMismatch,status:self||locked.length||transportMismatch.length?'unavailable':matches.length===required.length&&matches.length?'full':matches.length?'partial':'unavailable',
+    reason:self?'A junction cannot route to itself':transportMismatch.length?transportMismatch.map(l=>l.name+' uses '+l.network.transport.toUpperCase()+' transport, source offers '+source.levels.find(s=>s.key===l.key).network.transport.toUpperCase()).join(' · '):locked.length?locked.map(l=>l.name+' is locked').join(' · '):unchanged.map(({level})=>`${level.name} ${missingLevelPolicy==='keep'?'stays unchanged':'will disconnect'}`).join(' · ')||(!required.length?'No routable levels':'')};
 }
 export function supportsSide(group,side) {return group.side===side||group.side==='bidirectional'||group.bidirectional===true;}
 

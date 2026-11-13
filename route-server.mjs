@@ -98,7 +98,7 @@ function registryQueryUrl(registry = connectedRegistry()) {
 }
 
 function refresh() {
-  const next = applyManualGroups(inventoryOf(backend.state()), manualGroups.groups);
+  const next = applyManualGroups(inventoryOf(backend.state(), {nmosState: backend.nmosState()}), manualGroups.groups);
   const nextHash = createHash('sha256').update(JSON.stringify(next)).digest('hex');
   const changed = nextHash !== inventoryHash;
   if (changed) { cache = next; inventoryHash = nextHash; revision++; }

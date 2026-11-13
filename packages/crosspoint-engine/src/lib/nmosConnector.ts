@@ -1370,6 +1370,38 @@ export class NmosRegistryConnector {
             return info;
         }
 
+        // NMOS-Routing patch (BCP-007-03): MXL senders have no transport
+        // file. Their IS-05 transport_params (mxl_domain_id / mxl_flow_id)
+        // come from the sender's /active resource, which getSenderActiveData
+        // already mirrors into nmosState.senderActiveData.
+        if(sender.transport == "urn:x-nmos:transport:mxl"){
+            info.transport = "mxl";
+            info.active = !!sender.subscription?.active;
+            let activeData:any = (this.nmosState as any).senderActiveData?.[senderId];
+            if(!activeData || !Array.isArray(activeData.transport_params)){
+                let hrefs:string[] = [];
+                try{
+                    for(let ctrlType of ["urn:x-nmos:control:sr-ctrl/v1.1", "urn:x-nmos:control:sr-ctrl/v1.0"]){
+                        device.controls.forEach((c:any)=>{ if(c.type === ctrlType){ hrefs.push(c.href.replace(/\/?$/, "/") + "single/senders/" + senderId + "/active/"); } });
+                        if(hrefs.length > 0) break;
+                    }
+                }catch(e){}
+                for(let href of hrefs){
+                    try{ activeData = (await axios.get(href)).data; break; }catch(e){}
+                }
+            }
+            let params = Array.isArray(activeData?.transport_params) ? activeData.transport_params : [];
+            if(!params.length || typeof params[0]?.mxl_flow_id !== "string" || !params[0].mxl_flow_id){
+                info.error = "MXL sender has no mxl_flow_id in its active transport parameters";
+                return info;
+            }
+            info.mxlParams = params.map((p:any) => ({ mxl_domain_id: p.mxl_domain_id, mxl_flow_id: p.mxl_flow_id }));
+            sender.interface_bindings?.forEach((name:any)=>{
+                node.interfaces?.forEach((inter:any)=>{ if(inter.name == name){ info.interfaces.push({name:name,mac:inter.port_id}); } });
+            });
+            return info;
+        }
+
         // TODO: need to load manifest always
         // Now: Always load manifest
         //if(this.nmosState.sendersManifestDetail.hasOwnProperty(senderId)){
@@ -1494,10 +1526,27 @@ export class NmosRegistryConnector {
             }
         }
 
+        // NMOS-Routing patch (BCP-007-03): MXL receivers take
+        // {mxl_domain_id, mxl_flow_id} per leg and no transport_file;
+        // rtp_enabled does not exist for them. Transports must match.
+        let receiverIsMxl = (receiver.transport == "urn:x-nmos:transport:mxl");
+        if(senderInfo.senderId != "disconnect" && receiverIsMxl !== (senderInfo.transport == "mxl")){
+            let id = SyncLog.log("error", "nmos_connect", "Transport mismatch: receiver " + receiverId + " is " + (receiverIsMxl ? "MXL" : "RTP") + ", sender is " + (senderInfo.transport || "unknown") + ".");
+            throw new LoggedError("Sender and receiver use different transports (" + (senderInfo.transport || "unknown") + " vs " + (receiverIsMxl ? "mxl" : "rtp") + ").", id);
+        }
+
         let receiverLegCount = receiver.interface_bindings.length;
+        if(receiverIsMxl && receiverLegCount < 1) receiverLegCount = 1;
         for(let i = 0; i < receiverLegCount; i++){
             if(senderInfo.senderId == "disconnect"){
-                patch.transport_params.push({ rtp_enabled: false });
+                patch.transport_params.push(receiverIsMxl ? {} : { rtp_enabled: false });
+                continue;
+            }
+            if(senderInfo.transport == "mxl"){
+                let p:any = (senderInfo.mxlParams || [])[i] || (senderInfo.mxlParams || [])[0] || {};
+                let leg:any = { mxl_flow_id: p.mxl_flow_id };
+                if(typeof p.mxl_domain_id === "string" && p.mxl_domain_id){ leg.mxl_domain_id = p.mxl_domain_id; }
+                patch.transport_params.push(leg);
                 continue;
             }
             if(senderInfo.transport == "rtp.mcast" || senderInfo.transport == "rtp"){

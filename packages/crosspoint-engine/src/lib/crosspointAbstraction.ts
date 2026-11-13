@@ -1805,7 +1805,10 @@ export interface CrosspointConnectionSenderInfo {
     interfaces:any[],
     active:boolean,
     error:string,
-    transport:string
+    transport:string,
+    // NMOS-Routing patch (BCP-007-03): IS-05 transport_params of an MXL
+    // sender ({mxl_domain_id, mxl_flow_id} per leg), copied to the receiver.
+    mxlParams?:any[]
 }
 
 export interface CrosspointShadowDevice {

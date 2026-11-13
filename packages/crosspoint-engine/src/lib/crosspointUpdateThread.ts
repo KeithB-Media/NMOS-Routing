@@ -874,6 +874,10 @@ class CrosspointUpdateThread{
                                     ){
                                         source.capabilities.transport = "rtp";
                                     }
+                                    // NMOS-Routing patch (BCP-007-03)
+                                    if(this.nmosState.senders[nmosId].transport == "urn:x-nmos:transport:mxl"){
+                                        source.capabilities.transport = "mxl";
+                                    }
                                     source.capabilities.mediaTypes.push(this.nmosState.flows[this.nmosState.senders[nmosId].flow_id].media_type);
                                     // Subscription may not yet be populated for a freshly-
                                     // registered sender — guard with optional chaining so an
@@ -934,6 +938,10 @@ class CrosspointUpdateThread{
                                         this.nmosState.receivers[nmosId].transport == "urn:x-nmos:transport:rtp.mcast"
                                     ){
                                         receiver.capabilities.transport = "rtp";
+                                    }
+                                    // NMOS-Routing patch (BCP-007-03)
+                                    if(this.nmosState.receivers[nmosId].transport == "urn:x-nmos:transport:mxl"){
+                                        receiver.capabilities.transport = "mxl";
                                     }
                                     // Same defensive treatment as the sender side — a brand-
                                     // new IS-04 receiver may lack `subscription` or `caps`

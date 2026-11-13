@@ -67,8 +67,10 @@ refuses writes.
   [chrisjlapp/nmos-crosspoint_v3](https://github.com/chrisjlapp/nmos-crosspoint_v3)
   (NMOS Crosspoint, © Johannes Grieb, MIT — see
   `packages/crosspoint-engine/LICENSE.md`; the upstream commit is recorded in
-  `UPSTREAM-COMMIT`). Its `src/lib` is kept unmodified so upstream fixes can
-  be merged; only `package.json`/`tsconfig.json` were adjusted to build it as
-  a library, and `server.ts`/the Svelte UI are not used.
+  `UPSTREAM-COMMIT`). Its `src/lib` is kept as close to upstream as possible so
+  fixes can be merged: the only changes are the marked BCP-007-03 (MXL) hunks
+  listed in `packages/crosspoint-engine/UPSTREAM-PATCHES.md`, plus
+  `package.json`/`tsconfig.json` adjustments to build it as a library.
+  `server.ts` and the Svelte UI are not used.
 - The operator UI and server come from
   [KeithB-Media/videoipath-route-desk](https://github.com/KeithB-Media/videoipath-route-desk).

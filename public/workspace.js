@@ -37,5 +37,6 @@ export function namedGroup(group,set='') {
   return {...group,defaultName:group.name,name:group.aliases?.[set]||group.name};
 }
 export function networkValues(group,level,field) {
-  return [...new Set((level?[level]:group.levels).flatMap(l=>l.network?.legs||[]).map(leg=>field==='multicast'?leg.multicast:leg.source).filter(Boolean))];
+  // MXL flows (BCP-007-03) have no multicast legs: show the MXL domain in the address column and the MXL flow id as the source.
+  return [...new Set((level?[level]:group.levels).flatMap(l=>l.network?.transport==='mxl'?[l.network.mxl?(field==='multicast'?'MXL · '+(l.network.mxl.domainId||'default domain'):'flow '+l.network.mxl.flowId):(field==='multicast'?'MXL':'')]:(l.network?.legs||[]).map(leg=>field==='multicast'?leg.multicast:leg.source)).filter(Boolean))];
 }
