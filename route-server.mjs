@@ -30,7 +30,7 @@ function demoBackend(state) {
     return null;
   };
   return {
-    mode: 'demo', state: () => state, nmosState: () => ({}), connectionState: () => ({registries: [], dnssd: {enabled: false}}),
+    mode: 'demo', state: () => state, nmosState: () => state.nmosMirror || {}, connectionState: () => ({registries: [], dnssd: {enabled: false}}),
     onState(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     async connect(from, to) {
       const src = find(from, 'senders'), dst = find(to, 'receivers');
@@ -218,7 +218,7 @@ async function applyAll(jobs) {
 const routed = (from, to) => cache.routes.some(r => r.from === from && r.to === to);
 
 const files = {'/': ['index.html', 'text/html'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/fonts/Lora.ttf': ['fonts/Lora.ttf', 'font/ttf'], '/fonts/CormorantGaramond.ttf': ['fonts/CormorantGaramond.ttf', 'font/ttf']};
-for (const name of ['app', 'matrix', 'name-series', 'workspace', 'column-sorter', 'column-resize', 'live-updates', 'route-options', 'route-feedback', 'search', 'themes', 'nmos-viewer', 'nmos-groups', 'panels', 'panel-model', 'setup', 'audio-monitor']) files['/' + name + '.js'] = [name + '.js', 'text/javascript'];
+for (const name of ['app', 'matrix', 'name-series', 'workspace', 'column-sorter', 'column-resize', 'live-updates', 'route-options', 'caps', 'route-feedback', 'search', 'themes', 'nmos-viewer', 'nmos-groups', 'panels', 'panel-model', 'setup', 'audio-monitor']) files['/' + name + '.js'] = [name + '.js', 'text/javascript'];
 for (const name of ['style', 'themes', 'panels']) files['/' + name + '.css'] = [name + '.css', 'text/css'];
 const staticCache = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([url, [name, type]]) => [url, {data: await readAsset('public/' + name), type}])));
 

@@ -63,7 +63,10 @@ indicator until the registry push arrives.
    `makeConnection` sends them with no `transport_file` and refuses RTP/MXL
    mixes (see `packages/crosspoint-engine/UPSTREAM-PATCHES.md`). Adapter
    exposes `level.network.transport` and `.mxl`; planners refuse mismatches.
-   Still open: BCP-004-01 constraint-set evaluation beyond the transport check.
+   BCP-004-01: `public/caps.js` (shared by server planner and browser) evaluates
+   receiver `caps` from the raw IS-04 mirror against sender parameters;
+   `lib/model.mjs` `mxlCapsCheck` refuses unsatisfied MXL routes unless
+   `force: true`. RTP receivers are not judged yet.
 5. ~~Audio monitor + multicast probe~~ — done: `/api/audio/*`,
    `public/audio-monitor.js`, `/probe` upgrade served by `LiveHub`; native
    modules are optional (`WITH_AUDIO=1` image build).
@@ -71,5 +74,5 @@ indicator until the registry push arrives.
    sub-app for `/x-nmos/*`, `NmosNodeRegistration` started/stopped from Setup
    and re-registered on registry switches; DDNS runs via `DdnsService`.
 
-Open: BCP-004-01 constraint-set evaluation for MXL, IS-08 channel mapping,
+Open: BCP-004-01 evaluation for RTP receivers (advisory), IS-08 channel mapping,
 receiver-side SDP (IS-05 active `transport_file`) in the SDP popup.

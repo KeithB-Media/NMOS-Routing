@@ -22,4 +22,5 @@ Adds the MXL transport (`urn:x-nmos:transport:mxl`) next to RTP.
 
 Spec: https://specs.amwa.tv/bcp-007-03/ (IS-04 v1.3+, IS-05 v1.2+). Receiver
 capability checks (BCP-004-01 `constraint_sets`) are done in NMOS Routing's
-planner layer, not in the engine.
+planner layer (`public/caps.js`, `lib/model.mjs`), not in the engine, so no
+further engine patch was needed.

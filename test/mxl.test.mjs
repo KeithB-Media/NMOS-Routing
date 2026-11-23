@@ -39,7 +39,7 @@ test('planners refuse to mix transports and explain why; same-transport routes p
   const cam = groups.find(g => g.id === 'src:nmosgrp_cam1'), mxlIn = groups.find(g => g.id === 'dst:nmos_mxl1'), mxlOut = groups.find(g => g.id === 'src:nmos_mxl1'), mon = groups.find(g => g.id === 'dst:nmosgrp_mon1');
   assert.throws(() => planRoute(groups, routes, {sourceId: cam.id, destinationId: mxlIn.id}), /uses MXL transport; CAM 1 offers RTP/);
   assert.throws(() => planRoute(groups, routes, {sourceId: mxlOut.id, destinationId: mon.id, levelKey: 'video-1'}), /uses RTP transport; MXL Function 1 offers MXL/);
-  assert.deepEqual(planRoute(groups, routes, {sourceId: mxlOut.id, destinationId: mxlIn.id}).map(e => [e.from, e.to]), [[mxlOut.levels[0].id, mxlIn.levels[0].id]]);
+  assert.deepEqual(planRoute(groups, routes, {sourceId: mxlOut.id, destinationId: mxlIn.id}).map(e => [e.from, e.to]), mxlIn.levels.map((l, i) => [mxlOut.levels[i].id, l.id]), 'video and audio route level by level');
   const mismatch = routeCompatibility(cam, mxlIn);
   assert.equal(mismatch.status, 'unavailable'); assert.match(mismatch.reason, /Video 1 uses MXL transport, source offers RTP/);
   assert.equal(routeCompatibility(mxlOut, mxlIn).status, 'full');

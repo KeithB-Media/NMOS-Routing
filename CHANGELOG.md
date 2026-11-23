@@ -41,5 +41,14 @@ nmos-crosspoint v3 engine (vendored, MIT).
 - Audio monitor: headphone button on audio senders streams the multicast as
   Opus over WebRTC (`/api/audio/*`). Needs the optional native modules —
   build the image with `WITH_AUDIO=1`.
-- Tests: 78 passing, including IS-05 PATCH-body tests against a mock node and
+- BCP-004-01 Receiver Capabilities for MXL receivers (BCP-007-03 requires
+  Controllers to evaluate them): `public/caps.js` evaluates `media_types` and
+  `constraint_sets` (OR across sets, AND within a set, inclusive
+  enum/minimum/maximum, rationals by cross-multiplication, `meta:enabled`,
+  `meta:preference`, unrecognised parameters ignored) against sender values
+  derived from the IS-04 Sender/Flow/Source. Incompatible MXL takes are
+  refused with the failing constraints named; `force: true` on `/api/route`
+  overrides (BCP-004-01 permits it). Demo mode gains a second MXL function
+  with UHD video and 96 kHz audio to show refusals.
+- Tests: 87 passing, including IS-05 PATCH-body tests against a mock node and
   a live-mode engine boot test.

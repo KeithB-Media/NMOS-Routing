@@ -1,3 +1,5 @@
+import {evaluateCaps} from './caps.js';
+
 export function groupSearchFields(group,tags=group.tags||[]) {
   const aliases=[...String(group.description||'').matchAll(/^Alias:\s*(.+)$/gmi)].map(m=>m[1].trim());
   return [group.name,group.system,group.description,...Object.values(group.aliases||{}),...aliases,...tags].filter(Boolean);
@@ -20,15 +22,15 @@ export function destinationRouteSummary(group, routesByDestination, endpointOwne
 
 export function routeCompatibility(source,destination,levelKey,lockedEndpoints=new Set(),missingLevelPolicy='disconnect') {
   const required=destination.levels.filter(l=>!levelKey||l.key===levelKey);
-  const matches=[],unchanged=[],locked=[],transportMismatch=[];
+  const matches=[],unchanged=[],locked=[],transportMismatch=[],capsMismatch=[];
   for(const level of required) {
     const sourceLevel=source.levels.find(s=>s.key===level.key);
     if(!sourceLevel) {unchanged.push({level});if(!levelKey&&missingLevelPolicy==='disconnect'&&lockedEndpoints.has(level.id))locked.push(level);}
-    else {matches.push(level);if(lockedEndpoints.has(level.id))locked.push(level);if(sourceLevel.network?.transport&&level.network?.transport&&sourceLevel.network.transport!==level.network.transport)transportMismatch.push(level);}
+    else {matches.push(level);if(lockedEndpoints.has(level.id))locked.push(level);if(sourceLevel.network?.transport&&level.network?.transport&&sourceLevel.network.transport!==level.network.transport)transportMismatch.push(level);else if(level.network?.transport==='mxl'&&level.caps){const caps=evaluateCaps(level.caps,sourceLevel.params);if(caps.evaluated&&!caps.ok)capsMismatch.push({level,reason:caps.reason});}}
   }
   const self=source.id===destination.id||matches.some(d=>source.levels.find(s=>s.key===d.key)?.id===d.id);
-  return {required,matches,unchanged,locked,transportMismatch,status:self||locked.length||transportMismatch.length?'unavailable':matches.length===required.length&&matches.length?'full':matches.length?'partial':'unavailable',
-    reason:self?'A junction cannot route to itself':transportMismatch.length?transportMismatch.map(l=>l.name+' uses '+l.network.transport.toUpperCase()+' transport, source offers '+source.levels.find(s=>s.key===l.key).network.transport.toUpperCase()).join(' · '):locked.length?locked.map(l=>l.name+' is locked').join(' · '):unchanged.map(({level})=>`${level.name} ${missingLevelPolicy==='keep'?'stays unchanged':'will disconnect'}`).join(' · ')||(!required.length?'No routable levels':'')};
+  return {required,matches,unchanged,locked,transportMismatch,capsMismatch,status:self||locked.length||transportMismatch.length||capsMismatch.length?'unavailable':matches.length===required.length&&matches.length?'full':matches.length?'partial':'unavailable',
+    reason:self?'A junction cannot route to itself':transportMismatch.length?transportMismatch.map(l=>l.name+' uses '+l.network.transport.toUpperCase()+' transport, source offers '+source.levels.find(s=>s.key===l.key).network.transport.toUpperCase()).join(' · '):capsMismatch.length?capsMismatch.map(c=>c.level.name+' cannot consume this flow (BCP-004-01): '+c.reason).join(' · '):locked.length?locked.map(l=>l.name+' is locked').join(' · '):unchanged.map(({level})=>`${level.name} ${missingLevelPolicy==='keep'?'stays unchanged':'will disconnect'}`).join(' · ')||(!required.length?'No routable levels':'')};
 }
 export function supportsSide(group,side) {return group.side===side||group.side==='bidirectional'||group.bidirectional===true;}
 
